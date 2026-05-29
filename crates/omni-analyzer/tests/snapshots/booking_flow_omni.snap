@@ -1,0 +1,11 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "warning[E0605]: Workflow 'BookingFlow': state 'Failed' is unreachable (dead state)"
+ir:
+  module_path: acme.booking
+  types: []
+  services: []
+  build_order: []

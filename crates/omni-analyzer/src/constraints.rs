@@ -12,6 +12,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
             if s.constraints.is_empty() {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Warning,
+                    code: "E0301",
                     message: format!(
                         "service '{}' has no constraints — consider adding latency, reliability, or security constraints",
                         s.name
@@ -24,6 +25,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
             if s.goal.is_none() {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Warning,
+                    code: "E0302",
                     message: format!(
                         "service '{}' has no goal — the goal field helps AI agents understand the intent",
                         s.name
@@ -37,6 +39,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
                 if let Expression::Literal(Literal::String(text)) = inv {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Warning,
+                        code: "E0303",
                         message: format!(
                             "Invariant '{}' in service '{}' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression.",
                             text, s.name
@@ -56,6 +59,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
                 if !seen.insert(name) {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0304",
                         message: format!("duplicate constraint '{}' in service '{}'", name, s.name),
                         span: s.span,
                     });
@@ -69,6 +73,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
                     if let Expression::Literal(Literal::String(text)) = pre {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Warning,
+                            code: "E0305",
                             message: format!(
                                 "Precondition '{}' in operation '{}.{}' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression.",
                                 text, s.name, op.name
@@ -83,6 +88,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
                     if let Expression::Literal(Literal::String(text)) = post {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Warning,
+                            code: "E0306",
                             message: format!(
                                 "Postcondition '{}' in operation '{}.{}' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression.",
                                 text, s.name, op.name
@@ -95,6 +101,7 @@ pub fn validate_constraints(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>
                 if op.tests.is_empty() {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Info,
+                        code: "E0307",
                         message: format!(
                             "operation '{}.{}' has no test scenarios — consider adding tests for verification",
                             s.name, op.name

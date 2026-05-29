@@ -9,7 +9,9 @@ import * as fs from "fs";
 import * as path from "path";
 import * as crypto from "crypto";
 
-const CACHE_DIR = ".omni/cache";
+// Lives under the already-gitignored .omni-cache/ root so generated artifacts
+// are never accidentally committed.
+const CACHE_DIR = ".omni-cache/cas";
 
 export interface CacheEntry {
   hash: string;

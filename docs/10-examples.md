@@ -24,32 +24,30 @@ target: typescript
 
 // ─── Types ──────────────────────────────────────────────
 
-type CheckoutSession = struct {
-  id: UUID
-  cart_items: List<CartItem>(min: 1, max: 100)
-  shipping: ShippingAddress
-  payment: PaymentMethod
-  subtotal: Money
-  tax: Money
-  shipping_cost: Money
-  total: Money
-  currency: CurrencyCode
-  created_at: DateTime
-  expires_at: DateTime
-}
+type CheckoutSession = struct
+  id UUID
+  cart_items List<CartItem>(min: 1, max: 100)
+  shipping ShippingAddress
+  payment PaymentMethod
+  subtotal Money
+  tax Money
+  shipping_cost Money
+  total Money
+  currency CurrencyCode
+  created_at DateTime
+  expires_at DateTime
 
-type CheckoutResult = enum {
-  Success(order: Order, confirmation_number: String)
-  PaymentDeclined(reason: String, retry_allowed: Bool)
-  OutOfStock(unavailable_items: List<CartItem>)
+type CheckoutResult = enum
+  Success(order Order, confirmation_number String)
+  PaymentDeclined(reason String, retry_allowed Bool)
+  OutOfStock(unavailable_items List<CartItem>)
   SessionExpired
-}
 
 
 // ─── Main Service ───────────────────────────────────────
 
-service CheckoutService {
-  goal: "Process customer checkout with payment, inventory reservation, and order creation"
+service CheckoutService
+  goal "Process customer checkout with payment, inventory reservation, and order creation"
 
   depends_on:
     - InventoryService
@@ -66,34 +64,32 @@ service CheckoutService {
     - circuit_breaker(threshold: 5, timeout: 30s)
 
   metrics:
-    - counter payment_attempts_total {
-        description: "Total payment attempts"
-        labels: [payment_method, status]
-      }
-    - histogram checkout_value_usd {
-        description: "Distribution of transaction amounts"
-        buckets: [10, 50, 100, 500, 1000]
-      }
+    - counter payment_attempts_total
+        description "Total payment attempts"
+        labels [payment_method, status]
+    - histogram checkout_value_usd
+        description "Distribution of transaction amounts"
+        buckets [10, 50, 100, 500, 1000]
 
   budget:
     cost:
-      max_total: $0.30
-      per_retry: $0.05
+      max_total $0.30
+      per_retry $0.05
     tokens:
       model_strategy:
-        generation: SmartExpensive  // payment code must be high quality
-        validation: CheapFast
+        generation SmartExpensive  // payment code must be high quality
+        validation CheapFast
 
   // ─── Create Checkout Session ──────────────────────────
 
-  rpc CreateSession {
+  operation CreateSession
     inputs:
-      auth: AuthContext
-      cart_items: List<CartItem>(min: 1)
-      shipping: ShippingAddress
+      auth AuthContext
+      cart_items List<CartItem>(min: 1)
+      shipping ShippingAddress
 
     outputs:
-      session: CheckoutSession
+      session CheckoutSession
 
     preconditions:
       - auth.is_authenticated
@@ -130,18 +126,17 @@ service CheckoutService {
           no_auth()
           cart_items: [Factory<CartItem>.create()]
         expect_error: status == 401
-  }
 
   // ─── Process Checkout ─────────────────────────────────
 
-  rpc ProcessCheckout {
+  operation ProcessCheckout
     inputs:
-      session_id: UUID
-      payment_token: String  // tokenized, never raw card
-      idempotency_key: UUID
+      session_id UUID
+      payment_token String  // tokenized, never raw card
+      idempotency_key UUID
 
     outputs:
-      result: CheckoutResult
+      result CheckoutResult
 
     preconditions:
       - session exists and not expired
@@ -165,10 +160,10 @@ service CheckoutService {
       - sum_of_all_payments == sum_of_all_orders  // accounting conservation
 
     errors:
-      - SessionNotFound(session_id: UUID)
-      - SessionExpired(expired_at: DateTime)
-      - PaymentFailed(provider_error: String)
-      - InventoryConflict(items: List<CartItem>)
+      - SessionNotFound(session_id UUID)
+      - SessionExpired(expired_at DateTime)
+      - PaymentFailed(provider_error String)
+      - InventoryConflict(items List<CartItem>)
 
     tests:
       - scenario: "Successful checkout"
@@ -249,7 +244,6 @@ service CheckoutService {
         expect:
           application_logs do not contain "tok_live_abc123"
           audit_log contains masked version "tok_***123"
-  }
 
   evidence:
     required:
@@ -258,7 +252,6 @@ service CheckoutService {
       - security_scan(format: sarif, expect: no_critical)
       - benchmark(format: json, expect: matches_constraints)
       - pci_compliance_checklist(expect: all_items_checked)
-}
 ```
 
 ---
@@ -275,43 +268,42 @@ version: "1.0.0"
 target: typescript
 
 
-type Message = struct {
-  id: UUID
-  conversation_id: ConversationId
-  sender: UserId
-  content: MessageContent
-  sent_at: DateTime
-  edited_at: Option<DateTime>
-  reactions: Map<Emoji, Set<UserId>>
-  thread_id: Option<UUID>
-  read_by: Set<UserId>
-}
+type Message = struct
+  id UUID
+  conversation_id ConversationId
+  sender UserId
+  content MessageContent
+  sent_at DateTime
+  edited_at Option<DateTime>
+  reactions Map<Emoji, Set<UserId>>
+  thread_id Option<UUID>
+  read_by Set<UserId>
 
-type MessageContent = enum {
-  Text(body: String(max_length: 4000))
-  Image(url: URL, caption: Option<String>)
-  File(url: URL, name: String, size_bytes: Int)
-  System(event: SystemEvent)
-}
+type MessageContent = enum
+  Text(body String(max_length: 4000))
+  Image(url URL, caption Option<String>)
+  File(url URL, name String, size_bytes Int)
+  System(event SystemEvent)
 
-type Conversation = struct {
-  id: ConversationId
-  type: enum { DirectMessage, Group, Channel }
-  participants: Set<UserId>(min: 2)
-  name: Option<String>
-  created_at: DateTime
-  last_message_at: DateTime
-}
+type Conversation = struct
+  id ConversationId
+  type enum
+    DirectMessage
+    Group
+    Channel
+  participants Set<UserId>(min: 2)
+  name Option<String>
+  created_at DateTime
+  last_message_at DateTime
 
-type TypingIndicator = struct {
-  user: UserId
-  conversation: ConversationId
-  started_at: DateTime
-}
+type TypingIndicator = struct
+  user UserId
+  conversation ConversationId
+  started_at DateTime
 
 
-service ChatService {
-  goal: "Real-time messaging with typing indicators, read receipts, and reactions"
+service ChatService
+  goal "Real-time messaging with typing indicators, read receipts, and reactions"
 
   constraints:
     - websocket_support
@@ -325,15 +317,15 @@ service ChatService {
     - profanity_filter(configurable: true)
     - max_participants_per_group: 500
 
-  rpc SendMessage {
+  operation SendMessage
     inputs:
-      auth: AuthContext
-      conversation_id: ConversationId
-      content: MessageContent
-      thread_id: Option<UUID>
+      auth AuthContext
+      conversation_id ConversationId
+      content MessageContent
+      thread_id Option<UUID>
 
     outputs:
-      message: Message
+      message Message
 
     preconditions:
       - auth.user_id in conversation.participants
@@ -370,12 +362,11 @@ service ChatService {
         given: user_a in conversation
         when: user_a sends 31 messages in 1 minute
         expect: 31st message rejected with RateLimited error
-  }
 
-  rpc StartTyping {
+  operation StartTyping
     inputs:
-      auth: AuthContext
-      conversation_id: ConversationId
+      auth AuthContext
+      conversation_id ConversationId
 
     postconditions:
       - all other online participants see typing indicator
@@ -393,13 +384,12 @@ service ChatService {
         given: user_a starts typing
         when: 5s pass without renewal
         expect: typing indicator disappears for all participants
-  }
 
-  rpc ReactToMessage {
+  operation ReactToMessage
     inputs:
-      auth: AuthContext
-      message_id: UUID
-      emoji: Emoji
+      auth AuthContext
+      message_id UUID
+      emoji Emoji
 
     postconditions:
       - reaction added to message
@@ -415,8 +405,6 @@ service ChatService {
         given: user_a already reacted with 👍
         when: user_a reacts with 👍 again
         expect: message.reactions[👍] does not contain user_a.id
-  }
-}
 ```
 
 ---
@@ -433,39 +421,43 @@ version: "1.0.0"
 target: python
 
 
-type ModelVersion = struct {
-  model_id: String
-  version: String(format: semver)
-  artifact_path: URL
-  input_schema: JSONSchema
-  output_schema: JSONSchema
-  metadata: struct {
-    trained_at: DateTime
-    training_metrics: Map<String, Float64>
-    framework: enum { PyTorch, TensorFlow, ONNX, JAX }
-    size_bytes: Int
-  }
-}
+type ModelVersion = struct
+  model_id String
+  version String(format: semver)
+  artifact_path URL
+  input_schema JSONSchema
+  output_schema JSONSchema
+  metadata struct
+    trained_at DateTime
+    training_metrics Map<String, Float64>
+    framework enum
+      PyTorch
+      TensorFlow
+      ONNX
+      JAX
+    size_bytes Int
 
-type PredictionRequest = struct {
-  model_id: String
-  version: Option<String>  // None = latest
-  input: JSON
-  request_id: UUID
-  priority: enum { Low, Normal, High, Critical }
-}
+type PredictionRequest = struct
+  model_id String
+  version Option<String>  // None = latest
+  input JSON
+  request_id UUID
+  priority enum
+    Low
+    Normal
+    High
+    Critical
 
-type PredictionResponse = struct {
-  prediction: JSON
-  model_version: String
-  latency_ms: Float64
-  confidence: Float64
-  request_id: UUID
-}
+type PredictionResponse = struct
+  prediction JSON
+  model_version String
+  latency_ms Float64
+  confidence Float64
+  request_id UUID
 
 
-service ModelServingPlatform {
-  goal: "Serve ML models with low latency, auto-scaling, A/B testing, and monitoring"
+service ModelServingPlatform
+  goal "Serve ML models with low latency, auto-scaling, A/B testing, and monitoring"
 
   constraints:
     - latency(p50: <20ms, p95: <50ms, p99: <200ms) for inference
@@ -476,12 +468,12 @@ service ModelServingPlatform {
     - graceful_degradation  // return cached/fallback on overload
     - canary_deployment(traffic_percentage: 5, duration: 30min)
 
-  rpc Predict {
+  operation Predict
     inputs:
-      request: PredictionRequest
+      request PredictionRequest
 
     outputs:
-      response: PredictionResponse
+      response PredictionResponse
 
     preconditions:
       - model exists and is deployed
@@ -518,16 +510,18 @@ service ModelServingPlatform {
           remaining replicas absorb traffic
           new replica starts within 30s
           no failed predictions during failover
-  }
 
-  rpc DeployModel {
+  operation DeployModel
     inputs:
-      model: ModelVersion
-      strategy: enum { RollingUpdate, BlueGreen, Canary }
+      model ModelVersion
+      strategy enum
+        RollingUpdate
+        BlueGreen
+        Canary
 
     outputs:
-      deployment_id: UUID
-      status: DeploymentStatus
+      deployment_id UUID
+      status DeploymentStatus
 
     postconditions:
       - if strategy == Canary:
@@ -544,14 +538,12 @@ service ModelServingPlatform {
           auto_rollback within 5min
           alert fired: "Canary deployment rolled back"
           model-v1 still serving 100% traffic
-  }
 
   evidence:
     required:
       - test_results(format: junit_xml, expect: all_pass)
       - load_test_results(format: json, expect: meets_slo)
       - container_scan(expect: no_critical_vulnerabilities)
-}
 ```
 
 ---
@@ -564,61 +556,60 @@ module acme.policies.security
 version: "3.0.0"
 
 
-policy GlobalSecurityPolicy {
-  description: "Mandatory security requirements for all ACME services"
-  scope: global
-  enforced: true  // cannot be overridden by individual services
+policy GlobalSecurityPolicy
+  description "Mandatory security requirements for all ACME services"
+  scope global
+  enforced true  // cannot be overridden by individual services
 
   rules:
     // ─── Authentication ───────────────────────────────
     - all external-facing services must:
-        require: authentication
-        supported_methods: [JWT, OAuth2, mTLS]
-        session_ttl: max 24h
-        refresh_token_rotation: true
+        require authentication
+        supported_methods [JWT, OAuth2, mTLS]
+        session_ttl max 24h
+        refresh_token_rotation true
 
     // ─── Authorization ────────────────────────────────
     - all endpoints must:
-        implement: RBAC or ABAC
-        principle: least_privilege
-        log: all_access_decisions
+        implement RBAC or ABAC
+        principle least_privilege
+        log all_access_decisions
 
     // ─── Data Protection ──────────────────────────────
     - all PII fields must:
-        encrypt_at_rest: AES_256_GCM
-        mask_in_logs: true
-        comply_with: GDPR
-        retention_max: 2years unless legal_hold
+        encrypt_at_rest AES_256_GCM
+        mask_in_logs true
+        comply_with GDPR
+        retention_max 2years unless legal_hold
 
     // ─── Network Security ─────────────────────────────
     - all service-to-service communication must:
-        use: mTLS
-        certificate_rotation: every 90days
+        use mTLS
+        certificate_rotation every 90days
 
     - all external communication must:
-        use: TLS_1_3
-        HSTS: max_age 31536000, includeSubDomains
+        use TLS_1_3
+        HSTS max_age 31536000, includeSubDomains
 
     // ─── Input Validation ─────────────────────────────
     - all inputs must:
-        validate: schema + semantic
-        sanitize: XSS, SQL_injection, command_injection
-        max_size: 10MB unless explicitly configured
+        validate schema + semantic
+        sanitize XSS, SQL_injection, command_injection
+        max_size 10MB unless explicitly configured
 
     // ─── Secrets Management ───────────────────────────
     - all secrets must:
-        source: vault or environment (never hardcoded)
-        rotate: every 90days
-        audit: all_access_logged
+        source vault or environment (never hardcoded)
+        rotate every 90days
+        audit all_access_logged
 
     // ─── AI Agent Constraints ─────────────────────────
     - all AI agents must:
-        operate_with: least_privilege
-        log: all_tool_invocations
-        respect: budget_constraints
-        cannot: access production_data during generation
-        must: use tokenized test data
-}
+        operate_with least_privilege
+        log all_tool_invocations
+        respect budget_constraints
+        cannot access production_data during generation
+        must use tokenized test data
 ```
 
 ---
@@ -639,8 +630,8 @@ use ./analytics.{AnalyticsService}
 version: "1.0.0"
 
 
-system AcmePlatform {
-  goal: "Complete e-commerce platform with auth, catalog, checkout, shipping, notifications"
+system AcmePlatform
+  goal "Complete e-commerce platform with auth, catalog, checkout, shipping, notifications"
 
   services:
     - AuthService
@@ -690,5 +681,4 @@ system AcmePlatform {
       - architecture_diagram(type: generated, format: mermaid)
       - api_documentation(format: openapi_3)
       - runbook(for_each: service, covers: [deploy, rollback, incident_response])
-}
 ```

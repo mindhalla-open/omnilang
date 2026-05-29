@@ -167,6 +167,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0101",
                         message: format!("duplicate type definition: '{}'", t.name),
                         span: t.span,
                     });
@@ -197,6 +198,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0102",
                         message: format!("duplicate service definition: '{}'", s.name),
                         span: s.span,
                     });
@@ -218,6 +220,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0103",
                         message: format!("duplicate component definition: '{}'", c.name),
                         span: c.span,
                     });
@@ -238,6 +241,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0104",
                         message: format!("duplicate pipeline definition: '{}'", p.name),
                         span: p.span,
                     });
@@ -258,6 +262,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0105",
                         message: format!("duplicate workflow definition: '{}'", w.name),
                         span: w.span,
                     });
@@ -278,6 +283,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0106",
                         message: format!("duplicate agent definition: '{}'", a.name),
                         span: a.span,
                     });
@@ -298,6 +304,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0107",
                         message: format!("duplicate schema definition: '{}'", s.name),
                         span: s.span,
                     });
@@ -318,6 +325,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0108",
                         message: format!("duplicate policy definition: '{}'", p.name),
                         span: p.span,
                     });
@@ -338,6 +346,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0109",
                         message: format!("duplicate constraint definition: '{}'", c.name),
                         span: c.span,
                     });
@@ -358,6 +367,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0110",
                         message: format!("duplicate mixin definition: '{}'", m.name),
                         span: m.span,
                     });
@@ -379,6 +389,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0111",
                         message: format!("duplicate entity definition: '{}'", e.name),
                         span: e.span,
                     });
@@ -399,6 +410,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0112",
                         message: format!("duplicate action definition: '{}'", a.name),
                         span: a.span,
                     });
@@ -419,6 +431,7 @@ pub fn build_symbol_table(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) 
                 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0113",
                         message: format!("duplicate rule definition: '{}'", r.name),
                         span: r.span,
                     });

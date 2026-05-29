@@ -59,11 +59,7 @@ impl<'src> Lexer<'src> {
                 let is_line_comment_only = next_ch == '/'
                     && self.peek_next() == '/'
                     && self.peek_at_offset(2) != Some('/');
-                if self.is_at_end()
-                    || next_ch == '\n'
-                    || next_ch == '\r'
-                    || is_line_comment_only
-                {
+                if self.is_at_end() || next_ch == '\n' || next_ch == '\r' || is_line_comment_only {
                     self.skip_whitespace_non_newline();
                 } else {
                     // Only emit Indent/Dedent tokens when NOT inside
@@ -90,7 +86,10 @@ impl<'src> Lexer<'src> {
                             }
                             if spaces != *self.indent_stack.last().unwrap() {
                                 self.errors.push(ParseError::Expected {
-                                    expected: format!("indentation matching a previous level ({})", spaces),
+                                    expected: format!(
+                                        "indentation matching a previous level ({})",
+                                        spaces
+                                    ),
                                     found: format!("mismatched level ({})", spaces),
                                     span: Span::new(start_pos, self.pos),
                                 });
@@ -155,10 +154,10 @@ impl<'src> Lexer<'src> {
                 TokenKind::ParenOpen | TokenKind::BracketOpen | TokenKind::BraceOpen => {
                     self.paren_depth += 1;
                 }
-                TokenKind::ParenClose | TokenKind::BracketClose | TokenKind::BraceClose => {
-                    if self.paren_depth > 0 {
-                        self.paren_depth -= 1;
-                    }
+                TokenKind::ParenClose | TokenKind::BracketClose | TokenKind::BraceClose
+                    if self.paren_depth > 0 =>
+                {
+                    self.paren_depth -= 1;
                 }
                 _ => {}
             }
@@ -493,7 +492,6 @@ impl<'src> Lexer<'src> {
         }
     }
 
-
     fn is_at_end(&self) -> bool {
         self.pos >= self.source.len()
     }
@@ -580,7 +578,69 @@ mod tests {
     #[test]
     fn whitespace_only() {
         let kinds = lex_kinds("   \n\t  \n  ");
-        assert_eq!(kinds, vec![TokenKind::Newline, TokenKind::Newline, TokenKind::Eof]);
+        assert_eq!(
+            kinds,
+            vec![TokenKind::Newline, TokenKind::Newline, TokenKind::Eof]
+        );
+    }
+
+    // ── Layout (indentation) ──────────────────────────
+
+    #[test]
+    fn nested_indentation_emits_indent_dedent() {
+        // One nested block opens one Indent and closes with one Dedent.
+        let kinds = lex_kinds("service s\n  goal\n");
+        assert_eq!(
+            kinds,
+            vec![
+                TokenKind::KwService,
+                TokenKind::Ident,
+                TokenKind::Newline,
+                TokenKind::Indent,
+                TokenKind::KwGoal,
+                TokenKind::Newline,
+                TokenKind::Dedent,
+                TokenKind::Eof,
+            ]
+        );
+    }
+
+    #[test]
+    fn deeper_indentation_stacks_and_unwinds() {
+        // Two levels of nesting must produce two Indents and two matching Dedents.
+        let indents = lex_kinds("a\n  b\n    c\nd\n")
+            .into_iter()
+            .filter(|k| matches!(k, TokenKind::Indent | TokenKind::Dedent))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            indents,
+            vec![
+                TokenKind::Indent,
+                TokenKind::Indent,
+                TokenKind::Dedent,
+                TokenKind::Dedent,
+            ]
+        );
+    }
+
+    #[test]
+    fn indentation_suppressed_inside_parentheses() {
+        // Newlines/indentation inside a bracketed group must not emit layout tokens.
+        let kinds = lex_kinds("states: [\n  Created,\n  Paid,\n]\n");
+        assert!(!kinds.contains(&TokenKind::Indent));
+        assert!(!kinds.contains(&TokenKind::Dedent));
+    }
+
+    // ── Domain literals ───────────────────────────────
+
+    #[test]
+    fn domain_literals_are_distinct_kinds() {
+        assert_eq!(lex_kinds("5min")[0], TokenKind::DurationLiteral);
+        assert_eq!(lex_kinds("200ms")[0], TokenKind::DurationLiteral);
+        assert_eq!(lex_kinds("$0.10")[0], TokenKind::MoneyLiteral);
+        assert_eq!(lex_kinds("85%")[0], TokenKind::PercentageLiteral);
+        assert_eq!(lex_kinds("42")[0], TokenKind::IntLiteral);
+        assert_eq!(lex_kinds("3.14")[0], TokenKind::FloatLiteral);
     }
 
     // ── Keywords ──────────────────────────────────────
@@ -614,7 +674,7 @@ mod tests {
                 TokenKind::Ident,
                 TokenKind::Ident,
                 TokenKind::KwWorkflow,
-                TokenKind::Ident,
+                TokenKind::KwAgent,
                 TokenKind::KwSchema,
                 TokenKind::KwPolicy,
                 TokenKind::Ident,
@@ -1065,7 +1125,7 @@ mod tests {
         let input = "entity account\n  id text\n  balance money\n\n  status text\n\naction charge\n  inputs\n    amount money";
         let (tokens, errors) = Lexer::new(input).tokenize();
         assert!(errors.is_empty(), "unexpected errors: {errors:?}");
-        
+
         let kinds: Vec<TokenKind> = tokens.into_iter().map(|t| t.kind).collect();
         assert!(kinds.contains(&TokenKind::Indent));
         assert!(kinds.contains(&TokenKind::Dedent));

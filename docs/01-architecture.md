@@ -107,7 +107,7 @@ Selects the right agent (or model) for each task based on:
 Decomposes the specification into ordered generation tasks:
 
 ```
-Spec: service Checkout { ... }
+Spec: service Checkout
   ├── Task 1: Generate data types (PaymentStatus, Token)
   ├── Task 2: Generate service implementation
   ├── Task 3: Generate unit tests

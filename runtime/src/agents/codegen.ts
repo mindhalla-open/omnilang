@@ -61,7 +61,10 @@ export class CodeGenAgent {
     let match;
     while ((match = jsonBlockRegex.exec(cleanText)) !== null) {
       if (match[1]) {
-        const blockText = this.convertBackticksToDoubleQuotes(match[1].trim());
+        // Parse the raw block first: valid JSON whose string values contain
+        // template-literal backticks (e.g. `Hello, ${name}!`) must not be
+        // mangled. Backtick→quote conversion is only a last-resort recovery.
+        const blockText = match[1].trim();
         try {
           const parsedBlock = JSON.parse(blockText);
           if (parsedBlock && typeof parsedBlock === "object") {
@@ -95,16 +98,32 @@ export class CodeGenAgent {
             }
           }
         } catch (e) {
-          try {
-            const recovered = this.attemptJsonRecovery(blockText);
-            const parsedBlock = JSON.parse(recovered);
-            if (parsedBlock && typeof parsedBlock === "object") {
-              if (typeof parsedBlock.path === "string" && typeof parsedBlock.content === "string") {
-                files.push({ path: parsedBlock.path, content: parsedBlock.content });
+          // Recovery candidates, in order of fidelity.
+          const recoveryCandidates = [
+            this.attemptJsonRecovery(blockText),
+            this.convertBackticksToDoubleQuotes(blockText),
+          ];
+          for (const candidate of recoveryCandidates) {
+            try {
+              const parsedBlock = JSON.parse(candidate);
+              if (parsedBlock && typeof parsedBlock === "object") {
+                if (
+                  typeof parsedBlock.path === "string" &&
+                  typeof parsedBlock.content === "string"
+                ) {
+                  files.push({ path: parsedBlock.path, content: parsedBlock.content });
+                } else if (Array.isArray(parsedBlock.files)) {
+                  for (const f of parsedBlock.files) {
+                    if (typeof f.path === "string" && typeof f.content === "string") {
+                      files.push(f);
+                    }
+                  }
+                }
               }
+              if (files.length > 0) break;
+            } catch (recoveryErr) {
+              // try next candidate
             }
-          } catch (recoveryErr) {
-            // Ignore block parse failure
           }
         }
       }
@@ -122,26 +141,31 @@ export class CodeGenAgent {
       singleJsonText = singleJsonText.substring(firstBrace, lastBrace + 1).trim();
     }
 
-    singleJsonText = this.convertBackticksToDoubleQuotes(singleJsonText);
-
-    try {
-      const parsed = JSON.parse(singleJsonText);
-      this.normalizeResponse(parsed, serviceName);
-      this.validateResponseStructure(parsed);
-      return parsed;
-    } catch (e: any) {
+    // Try parse strategies in order of fidelity: raw JSON first (so valid JSON
+    // containing template-literal backticks is preserved), then structural
+    // recovery, then backtick→quote conversion as a last resort.
+    const candidates = [
+      singleJsonText,
+      this.attemptJsonRecovery(singleJsonText),
+      this.convertBackticksToDoubleQuotes(singleJsonText),
+      this.attemptJsonRecovery(this.convertBackticksToDoubleQuotes(singleJsonText)),
+    ];
+    let lastErr: any;
+    for (const candidate of candidates) {
       try {
-        const recoveredText = this.attemptJsonRecovery(singleJsonText);
-        const parsed = JSON.parse(recoveredText);
+        const parsed = JSON.parse(candidate);
         this.normalizeResponse(parsed, serviceName);
         this.validateResponseStructure(parsed);
         return parsed;
-      } catch (recoveryErr: any) {
-        console.error(pc.red("Failed to parse JSON response from LLM (even after recovery attempts):"));
-        console.error(pc.dim(response));
-        throw new Error(`Invalid JSON format from code generator: ${e.message}`);
+      } catch (e: any) {
+        lastErr = e;
       }
     }
+    console.error(
+      pc.red("Failed to parse JSON response from LLM (even after recovery attempts):"),
+    );
+    console.error(pc.dim(response));
+    throw new Error(`Invalid JSON format from code generator: ${lastErr?.message}`);
   }
 
   private normalizeResponse(parsed: any, serviceName: string): void {

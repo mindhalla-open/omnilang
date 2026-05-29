@@ -1,0 +1,23 @@
+module acme.support
+
+type orderId = uuid
+type orderSummary = string
+
+/// A runtime-interpreted agent whose boundaries become live guardrails.
+agent customerSupportAgent
+  goal "Handle tier-1 customer support inquiries"
+
+  capabilities:
+    - answer_faq
+    - look_up_order_status
+
+  boundaries:
+    - cannot: modify_pricing
+    - cannot: access_raw_payment_data
+    - must: identify_as_ai
+
+  tools:
+    - orderLookup(input: orderId, output: orderSummary)
+
+  model:
+    preference: Balanced

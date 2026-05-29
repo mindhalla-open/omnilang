@@ -1,0 +1,96 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - testing
+    - self_correction
+  span:
+    start: 0
+    end: 35
+imports: []
+exports: []
+declarations:
+  - Service:
+      name: selfCorrectingService
+      goal: Test self correction capabilities of the generator.
+      target: ~
+      constraints: []
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: Process
+          inputs:
+            - name: input_val
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 177
+                  end: 183
+              default: ~
+              doc_comment: ~
+              span:
+                start: 167
+                end: 183
+          outputs:
+            - name: result
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 210
+                  end: 216
+              default: ~
+              doc_comment: ~
+              span:
+                start: 203
+                end: 216
+          preconditions: []
+          postconditions: []
+          errors: []
+          constraints: []
+          tests:
+            - kind:
+                Scenario:
+                  name: Process successfully
+                  given: []
+                  when: []
+                  expect:
+                    - BinaryOp:
+                        left:
+                          Identifier:
+                            - result
+                            - start: 285
+                              end: 291
+                        op: Eq
+                        right:
+                          Literal:
+                            String: ok
+                        span:
+                          start: 285
+                          end: 299
+                  expect_error: ~
+              span:
+                start: 236
+                end: 300
+          doc_comment: ~
+          span:
+            start: 131
+            end: 300
+      budget: ~
+      metrics: []
+      invariants: []
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 37
+        end: 300

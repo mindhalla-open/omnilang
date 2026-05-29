@@ -61,6 +61,10 @@ describe("OmniLang End-to-End Integration", () => {
     );
 
     // Assert that the command compiled and finished successfully
+    if (buildResult.status !== 0) {
+      console.error("STDOUT:", buildResult.stdout?.toString());
+      console.error("STDERR:", buildResult.stderr?.toString());
+    }
     expect(buildResult.status).toBe(0);
 
     // Verify expected TypeScript code files were generated

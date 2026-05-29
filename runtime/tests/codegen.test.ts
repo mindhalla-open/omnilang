@@ -29,6 +29,7 @@ describe("CodeGenAgent", () => {
   const mockAppendFileSync = fs.appendFileSync as jest.Mock;
 
   const mockIr: SpecIR = {
+    ir_version: "1",
     module_path: ["test"],
     source_file: {
       module: { path: ["test"], span: { start: 0, end: 0 } },
@@ -104,6 +105,29 @@ describe("CodeGenAgent", () => {
     expect(fs.writeFileSync).toHaveBeenCalledWith(
       path.join("test-output", "a.ts"),
       "const x = 1;",
+      "utf8"
+    );
+  });
+
+  test("should preserve template-literal backticks inside string content", async () => {
+    // Regression: valid JSON whose content contains a template literal
+    // (`Hello, ${name}!`) must not be mangled by backtick→quote recovery.
+    const content =
+      "export function greet(name: string) { return `Hello, ${name}!`; }";
+    const responseWithMarkdown =
+      "```json\n" +
+      JSON.stringify({ files: [{ path: "src/greet.ts", content }] }) +
+      "\n```";
+
+    (mockProvider.generateCode as jest.Mock).mockResolvedValue(responseWithMarkdown);
+
+    const result = await agent.generateService("Greet", mockIr, "test-output", "typescript");
+
+    expect(result.success).toBe(true);
+    expect(result.files).toHaveLength(1);
+    expect(fs.writeFileSync).toHaveBeenCalledWith(
+      path.join("test-output", "src/greet.ts"),
+      content,
       "utf8"
     );
   });

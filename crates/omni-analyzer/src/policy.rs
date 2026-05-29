@@ -66,6 +66,7 @@ pub fn enforce_policies(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                 if has_override {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Warning,
+                        code: "E0501",
                         message: format!(
                             "Policy compliance: Goal enforcement overridden with justification for service '{}'",
                             s.name
@@ -75,6 +76,7 @@ pub fn enforce_policies(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                 } else {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0502",
                         message: format!(
                             "Policy violation: Service '{}' must define a 'goal' statement as per org-wide policy.",
                             s.name
@@ -103,6 +105,7 @@ pub fn enforce_policies(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                     if has_override {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Warning,
+                            code: "E0503",
                             message: format!(
                                 "Policy compliance: Budget limit override approved for service '{}'",
                                 s.name
@@ -112,6 +115,7 @@ pub fn enforce_policies(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                     } else {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Error,
+                            code: "E0504",
                             message: format!(
                                 "Policy violation: Service '{}' budget of ${} exceeds organization maximum limit of ${}",
                                 s.name, cost, limit

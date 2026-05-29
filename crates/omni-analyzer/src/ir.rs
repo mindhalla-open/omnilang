@@ -8,10 +8,17 @@ use crate::deps::DependencyGraph;
 use crate::symbols::SymbolTable;
 use crate::type_mapping::TypeMapping;
 
+/// Current Spec IR schema version. The orchestrator/codegen runtime rejects IR
+/// whose `ir_version` it does not understand, so this must be bumped whenever the
+/// IR shape changes in a way consumers must be aware of.
+pub const CURRENT_IR_VERSION: &str = "1";
+
 /// Validated Specification IR — the output of the analysis phase.
 /// This is consumed by the orchestrator/codegen pipeline.
-#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type, schemars::JsonSchema)]
 pub struct SpecIR {
+    /// Schema version of this IR document. See [`CURRENT_IR_VERSION`].
+    pub ir_version: String,
     /// Module path: `["acme", "payments", "checkout"]`
     pub module_path: Vec<String>,
     /// The parsed source file AST containing all declarations
@@ -28,7 +35,7 @@ pub struct SpecIR {
     pub stats: SpecStats,
 }
 
-#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type, schemars::JsonSchema)]
 pub struct TypeDef {
     pub name: String,
     pub kind: String, // "enum", "struct", "refined", "alias"
@@ -41,7 +48,7 @@ pub struct TypeDef {
 
 /// Configuration for generating constraint-aware arbitrary values.
 /// Extracted from refined type constraints to drive property-based test generators.
-#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type, schemars::JsonSchema)]
 pub struct GeneratorConfig {
     /// Minimum value for numeric ranges (from `range: [min, max]`)
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -63,10 +70,12 @@ pub struct GeneratorConfig {
     pub precision: Option<usize>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type, schemars::JsonSchema)]
 pub struct ServiceDef {
     pub name: String,
     pub goal: Option<String>,
+    /// Per-service target language override; `None` = build-wide target.
+    pub target: Option<String>,
     pub operation_count: usize,
     pub operation_names: Vec<String>,
     pub constraint_count: usize,
@@ -79,7 +88,7 @@ pub struct ServiceDef {
     pub evidence: Vec<String>,
 }
 
-#[derive(Debug, Clone, serde::Serialize, specta::Type)]
+#[derive(Debug, Clone, serde::Serialize, specta::Type, schemars::JsonSchema)]
 pub struct SpecStats {
     pub type_count: usize,
     pub service_count: usize,
@@ -153,6 +162,7 @@ pub fn build_spec_ir(
                 services.push(ServiceDef {
                     name: s.name.clone(),
                     goal: s.goal.clone(),
+                    target: s.target.clone(),
                     operation_count: s.operations.len(),
                     operation_names,
                     constraint_count: s.constraints.len(),
@@ -219,6 +229,7 @@ pub fn build_spec_ir(
     };
 
     SpecIR {
+        ir_version: CURRENT_IR_VERSION.to_string(),
         module_path: file.module.path.clone(),
         source_file: file.clone(),
         types,

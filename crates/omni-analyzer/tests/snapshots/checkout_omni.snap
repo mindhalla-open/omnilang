@@ -1,0 +1,18 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "info[E0307]: operation 'checkout.CancelOrder' has no test scenarios — consider adding tests for verification"
+  - "warning[E0902]: Logical Gap Detector: Operation 'PlaceOrder' in service 'checkout' has no preconditions defined. Input parameters might not be validated."
+ir:
+  module_path: acme.checkout
+  types:
+    - orderId
+    - orderStatus
+    - orderItem
+    - order
+  services:
+    - checkout
+  build_order:
+    - checkout

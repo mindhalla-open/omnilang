@@ -1,0 +1,40 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "warning[E0301]: service 'orderService' has no constraints — consider adding latency, reliability, or security constraints"
+  - "warning[E0305]: Precondition 'User must exist and have an Active status' in operation 'orderService.CreateOrder' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0305]: Precondition 'At least one item must be present in the order' in operation 'orderService.CreateOrder' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0305]: Precondition 'All product quantities must be strictly positive' in operation 'orderService.CreateOrder' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'Order total must be calculated as sum of item prices times quantities' in operation 'orderService.CreateOrder' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'Order status must start as Created' in operation 'orderService.CreateOrder' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'orderService.CreateOrder' has no test scenarios — consider adding tests for verification"
+  - "warning[E0305]: Precondition 'Order must exist and be in Created status' in operation 'orderService.ApplyPromoCode' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0305]: Precondition 'Promo code must be valid' in operation 'orderService.ApplyPromoCode' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'If order total exceeds $100 and user is VIP, apply a 10% discount' in operation 'orderService.ApplyPromoCode' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'orderService.ApplyPromoCode' has no test scenarios — consider adding tests for verification"
+  - "warning[E0305]: Precondition 'Order must be in Paid status to refund' in operation 'orderService.ProcessRefund' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'Order status is updated to Refunded on success' in operation 'orderService.ProcessRefund' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'orderService.ProcessRefund' has no test scenarios — consider adding tests for verification"
+  - "info[E0704]: Schema Validation: Entity 'user' does not enable Row Level Security (RLS). Consider adding @row_level_security decorator."
+  - "info[E0705]: Schema Validation: Entity 'user' does not enable soft deletes. Deletes will be permanent."
+  - "info[E0704]: Schema Validation: Entity 'product' does not enable Row Level Security (RLS). Consider adding @row_level_security decorator."
+  - "info[E0705]: Schema Validation: Entity 'product' does not enable soft deletes. Deletes will be permanent."
+  - "info[E0704]: Schema Validation: Entity 'order' does not enable Row Level Security (RLS). Consider adding @row_level_security decorator."
+  - "info[E0705]: Schema Validation: Entity 'order' does not enable soft deletes. Deletes will be permanent."
+  - "info[E0704]: Schema Validation: Entity 'orderItem' does not enable Row Level Security (RLS). Consider adding @row_level_security decorator."
+  - "info[E0705]: Schema Validation: Entity 'orderItem' does not enable soft deletes. Deletes will be permanent."
+ir:
+  module_path: acme.ordering
+  types:
+    - userId
+    - productId
+    - orderId
+    - orderItemId
+    - orderItem
+    - order
+  services:
+    - orderService
+  build_order:
+    - orderService

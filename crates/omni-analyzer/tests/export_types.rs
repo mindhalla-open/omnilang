@@ -139,6 +139,10 @@ fn export_typescript_types() {
     ts_defs.push_str("\n\n");
     ts_defs.push_str(&export::<ServicePolicy>(&config).unwrap());
     ts_defs.push_str("\n\n");
+    ts_defs.push_str(&export::<RuleDecl>(&config).unwrap());
+    ts_defs.push_str("\n\n");
+    ts_defs.push_str(&export::<ActionDecl>(&config).unwrap());
+    ts_defs.push_str("\n\n");
     ts_defs.push_str(&export::<Declaration>(&config).unwrap());
 
     ts_defs.push_str("\n\n");
@@ -155,10 +159,24 @@ fn export_typescript_types() {
     ts_defs.push_str(&export::<TypeMapping>(&config).unwrap());
     ts_defs.push_str("\n\n");
     ts_defs.push_str(&export::<SpecIR>(&config).unwrap());
-    ts_defs.push_str("\n");
+    ts_defs.push('\n');
 
     let output_path = "../../runtime/src/types.ts";
     fs::write(output_path, ts_defs).expect("Failed to write types.ts file");
 
     println!("TypeScript types successfully exported to {}", output_path);
+}
+
+/// Exports the JSON Schema for the Spec IR so the runtime can validate loaded IR
+/// structurally before generation. Like the TypeScript exporter, this regenerates
+/// the committed `ir.schema.json` on every `cargo test`; CI fails if it drifts.
+#[test]
+fn export_ir_json_schema() {
+    let schema = schemars::schema_for!(SpecIR);
+    let json = serde_json::to_string_pretty(&schema).expect("schema serializes to JSON");
+
+    let output_path = "../../runtime/src/ir.schema.json";
+    fs::write(output_path, format!("{json}\n")).expect("Failed to write ir.schema.json");
+
+    println!("IR JSON Schema successfully exported to {output_path}");
 }

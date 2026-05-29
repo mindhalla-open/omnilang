@@ -1,0 +1,12 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics: []
+ir:
+  module_path: acme.support
+  types:
+    - orderId
+    - orderSummary
+  services: []
+  build_order: []

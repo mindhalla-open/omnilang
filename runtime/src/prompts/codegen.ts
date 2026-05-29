@@ -1,6 +1,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { SpecIR, ServiceDecl, TypeDecl, TypeRef, TypeMapping } from "../types";
+import { enumerateContracts, formatContractsForPrompt } from "../contracts";
 
 function toSnakeCase(name: string): string {
   return name.replace(/([A-Z])/g, "_$1").toLowerCase().replace(/^_/, "");
@@ -69,6 +70,7 @@ export function getUserPrompt(serviceName: string, ir: SpecIR, target: string = 
   const specDetails = JSON.stringify(service, null, 2);
 
   const targetInfo = getTargetFileInfo(target, serviceName);
+  const contractsSection = formatContractsForPrompt(enumerateContracts(service));
 
   return `Generate the implementation and tests for the service: "${serviceName}".
 
@@ -77,6 +79,7 @@ ${types}
 
 Here is the Service Specification details:
 ${specDetails}
+${contractsSection}
 
 Please write the complete ${target === "typescript" ? "TypeScript" : target === "rust" ? "Rust" : target === "python" ? "Python" : "Go"} source code for both the service implementation and its corresponding tests.
 - The implementation code must be generated for the path: "${targetInfo.implPath}"
@@ -390,17 +393,29 @@ function formatTypeRef(ref: TypeRef, typeMappings?: TypeMapping[]): string {
     return `${arg} | null`;
   }
 
-  // Handle generic type arguments
+  // Handle generic type arguments (user-defined generic type)
   if (ref.type_args.length > 0) {
     const args = ref.type_args.map(arg => formatTypeRef(arg, typeMappings)).join(", ");
-    return `${ref.name}<${args}>`;
+    return `${toPascalCaseType(ref.name)}<${args}>`;
   }
-  
-  return ref.name;
+
+  // User-defined type reference — match the PascalCase name emitted in types.ts.
+  return toPascalCaseType(ref.name);
+}
+
+/// Converts an OmniLang type name to an idiomatic PascalCase TypeScript type
+/// name (`accountId` → `AccountId`, `order_item` → `OrderItem`). Applied
+/// consistently to both the emitted `types.ts` and the prompt so generated code
+/// references the exact names that exist.
+export function toPascalCaseType(name: string): string {
+  return name
+    .split(/[_\s-]+/)
+    .map((s) => (s.length ? s.charAt(0).toUpperCase() + s.slice(1) : s))
+    .join("");
 }
 
 export function formatTypeDecl(t: TypeDecl, typeMappings?: TypeMapping[]): string {
-  const name = t.name;
+  const name = toPascalCaseType(t.name);
   const kind = t.kind;
 
   if ("Alias" in kind) {

@@ -1,0 +1,210 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - banking
+    - demo
+  span:
+    start: 0
+    end: 24
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: accountId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 43
+            end: 49
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 26
+        end: 49
+  - Type:
+      name: account
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: id
+              ty:
+                name: accountId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 78
+                  end: 87
+              default: ~
+              doc_comment: ~
+              span:
+                start: 75
+                end: 87
+            - name: balance
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 98
+                  end: 103
+              default: ~
+              doc_comment: ~
+              span:
+                start: 90
+                end: 103
+            - name: status
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 113
+                  end: 119
+              default: ~
+              doc_comment: ~
+              span:
+                start: 106
+                end: 119
+          span:
+            start: 72
+            end: 121
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 51
+        end: 121
+  - Service:
+      name: bankTransferService
+      goal: Safely process bank transfers with invariants and self-correction
+      target: ~
+      constraints: []
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: Transfer
+          inputs:
+            - name: fromId
+              ty:
+                name: accountId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 321
+                  end: 330
+              default: ~
+              doc_comment: ~
+              span:
+                start: 314
+                end: 330
+            - name: toId
+              ty:
+                name: accountId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 342
+                  end: 351
+              default: ~
+              doc_comment: ~
+              span:
+                start: 337
+                end: 351
+            - name: amount
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 365
+                  end: 370
+              default: ~
+              doc_comment: ~
+              span:
+                start: 358
+                end: 370
+          outputs:
+            - name: success
+              ty:
+                name: bool
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 398
+                  end: 402
+              default: ~
+              doc_comment: ~
+              span:
+                start: 390
+                end: 402
+          preconditions:
+            - Literal:
+                String: Transfer amount must be strictly greater than zero
+            - Literal:
+                String: Sender account must have sufficient funds
+            - Literal:
+                String: Both accounts must exist and be in Active status
+          postconditions:
+            - Literal:
+                String: Sender balance must decrease by the transfer amount
+            - Literal:
+                String: Receiver balance must increase by the transfer amount
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Transfers money from one account to another
+          span:
+            start: 277
+            end: 743
+      budget: ~
+      metrics: []
+      invariants:
+        - BinaryOp:
+            left:
+              Identifier:
+                - balance_safety
+                - start: 761
+                  end: 775
+            op: Eq
+            right:
+              Literal:
+                String: account.balance >= 0
+            span:
+              start: 761
+              end: 799
+        - BinaryOp:
+            left:
+              Identifier:
+                - audit_trail
+                - start: 806
+                  end: 817
+            op: Eq
+            right:
+              Literal:
+                String: All successful transfers must create a transaction history entry
+            span:
+              start: 806
+              end: 885
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 121
+        end: 886

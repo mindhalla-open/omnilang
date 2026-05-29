@@ -40,6 +40,7 @@ describe("Prisma Generator - mapTypeToPrisma", () => {
 
   test("should resolve type aliases recursively", () => {
     const ir: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },
@@ -244,6 +245,7 @@ describe("Prisma Generator - injectRelationFields", () => {
 describe("Prisma Generator - generatePrismaSchema", () => {
   test("should return null if no schema block is present in SpecIR", () => {
     const ir: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },
@@ -275,6 +277,7 @@ describe("Prisma Generator - generatePrismaSchema", () => {
 
   test("should output valid prisma schema content when schema block is present", () => {
     const ir: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },

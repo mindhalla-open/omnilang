@@ -23,6 +23,7 @@ pub fn check_visibility(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
         if vis == Visibility::Private && file.exports.contains(name) {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0401",
                 message: format!(
                     "cannot export private declaration '{}': remove 'private' modifier or 'export' statement",
                     name
@@ -64,6 +65,7 @@ pub fn resolve_imports(
             if registry.is_empty() {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0402",
                     message: "registry import must specify a registry name".to_string(),
                     span: import.span,
                 });
@@ -72,6 +74,7 @@ pub fn resolve_imports(
             if version.is_none() {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Warning,
+                    code: "E0403",
                     message: format!(
                         "registry import from '{}' has no version constraint — consider pinning a version",
                         registry
@@ -112,6 +115,7 @@ pub fn expand_mixins(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                 if !mixins.contains_key(mixin_name) {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0404",
                         message: format!(
                             "service '{}' applies undefined mixin '{}'",
                             s.name, mixin_name
@@ -135,6 +139,11 @@ pub struct ModuleManifest {
     pub dependencies: Vec<DependencyEntry>,
 }
 
+/// The language syntax version this toolchain implements. Manifests that pin a
+/// different `syntax_version` are flagged so source written against an older or
+/// newer grammar is not silently misinterpreted.
+pub const CURRENT_SYNTAX_VERSION: &str = "0.2";
+
 #[derive(Debug, Clone)]
 pub struct PackageInfo {
     pub name: String,
@@ -142,6 +151,9 @@ pub struct PackageInfo {
     pub description: Option<String>,
     pub authors: Vec<String>,
     pub license: Option<String>,
+    /// Pinned OmniLang grammar version (`package.syntax_version`). `None` means
+    /// the manifest predates syntax pinning and the current version is assumed.
+    pub syntax_version: Option<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -186,6 +198,10 @@ pub fn parse_manifest(content: &str) -> Result<ModuleManifest, String> {
         .map(String::from);
     let license = pkg
         .get("license")
+        .and_then(|v| v.as_str())
+        .map(String::from);
+    let syntax_version = pkg
+        .get("syntax_version")
         .and_then(|v| v.as_str())
         .map(String::from);
 
@@ -242,6 +258,7 @@ pub fn parse_manifest(content: &str) -> Result<ModuleManifest, String> {
             description,
             authors,
             license,
+            syntax_version,
         },
         dependencies,
     })
@@ -445,6 +462,7 @@ version = "1.0.0"
 description = "Payment processing specs"
 authors = ["team@acme.com"]
 license = "Apache-2.0"
+syntax_version = "0.2"
 
 [dependencies]
 std = "^1.0"
@@ -454,6 +472,7 @@ community-auth = { registry = "omnilang", version = "^2.0" }
         let manifest = parse_manifest(toml).unwrap();
         assert_eq!(manifest.package.name, "acme-payments");
         assert_eq!(manifest.package.version, "1.0.0");
+        assert_eq!(manifest.package.syntax_version.as_deref(), Some("0.2"));
         assert_eq!(manifest.dependencies.len(), 3);
         // TOML tables iterate alphabetically (BTreeMap)
         let by_name: HashMap<&str, &DependencyEntry> = manifest
@@ -478,6 +497,7 @@ community-auth = { registry = "omnilang", version = "^2.0" }
                 description: None,
                 authors: vec![],
                 license: None,
+                syntax_version: None,
             },
             dependencies: vec![DependencyEntry {
                 name: "std".to_string(),

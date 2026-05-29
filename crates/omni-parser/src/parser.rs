@@ -741,12 +741,21 @@ impl Parser {
         let start = self.current_span();
         self.advance(); // consume 'service'
 
-        let name_tok = self.advance();
-        let name = name_tok.text.clone();
+        let name = if self.check(TokenKind::Ident) {
+            self.advance().text.clone()
+        } else {
+            self.errors.push(ParseError::Expected {
+                expected: "service name (identifier)".to_string(),
+                found: format!("'{}'", self.peek().text),
+                span: self.current_span(),
+            });
+            String::new()
+        };
 
         let close = self.expect_block_start();
 
         let mut goal = None;
+        let mut target = None;
         let mut constraints = Vec::new();
         let mut depends_on = Vec::new();
         let mut dependencies = Vec::new();
@@ -772,6 +781,16 @@ impl Parser {
                         let tok = self.advance();
                         // Strip quotes from string
                         goal = Some(tok.text[1..tok.text.len() - 1].to_string());
+                    }
+                }
+                TokenKind::KwTarget => {
+                    self.advance();
+                    if self.check(TokenKind::Colon) {
+                        self.advance();
+                    }
+                    // Per-service target language, e.g. `target rust`.
+                    if self.check(TokenKind::Ident) {
+                        target = Some(self.advance().text.clone());
                     }
                 }
                 TokenKind::KwConstraint | TokenKind::KwConstraints | TokenKind::Ident
@@ -871,6 +890,7 @@ impl Parser {
         Some(ServiceDecl {
             name,
             goal,
+            target,
             constraints,
             depends_on,
             dependencies,
@@ -1076,7 +1096,10 @@ impl Parser {
             let mut labels = Vec::new();
             let mut buckets = None;
 
-            if self.check(TokenKind::BraceOpen) || self.check(TokenKind::Newline) || self.check(TokenKind::Indent) {
+            if self.check(TokenKind::BraceOpen)
+                || self.check(TokenKind::Newline)
+                || self.check(TokenKind::Indent)
+            {
                 // Use expect_block_start to support both { } and indentation
                 let metric_close = if self.check(TokenKind::BraceOpen) {
                     self.advance();
@@ -1226,7 +1249,7 @@ impl Parser {
             // Check if this looks like a field declaration:
             // Either "name: Type" (with colon) or "name Type" (without colon)
             let is_field = if let Some(tok) = self.peek_at(0) {
-                if self.is_section_keyword(&tok) {
+                if self.is_section_keyword(tok) {
                     false
                 } else if tok.kind == TokenKind::Ident || tok.kind.is_keyword() {
                     if let Some(next) = self.peek_at(1) {
@@ -1689,10 +1712,8 @@ impl Parser {
             self.consume_newlines();
         }
 
-        if has_indent {
-            if self.check(TokenKind::Dedent) {
-                self.advance();
-            }
+        if has_indent && self.check(TokenKind::Dedent) {
+            self.advance();
         }
 
         exprs
@@ -2585,7 +2606,8 @@ impl Parser {
                     if has_states_indent {
                         self.advance();
                     }
-                    while ((self.check(TokenKind::Ident) || self.peek_kind().is_keyword()
+                    while ((self.check(TokenKind::Ident)
+                        || self.peek_kind().is_keyword()
                         || self.check(TokenKind::Minus))
                         && !self.is_section_keyword(self.peek()))
                         && !self.is_at_end()
@@ -3687,25 +3709,25 @@ impl Parser {
         let fields = self.parse_block(|parser| {
             let doc_comment = parser.consume_doc_comments();
             let fstart = parser.current_span();
-            
+
             if !parser.check(TokenKind::Ident) && !parser.peek_kind().is_keyword() {
                 return None;
             }
             let fname = parser.advance().text;
-            
+
             if parser.check(TokenKind::Colon) {
                 parser.advance();
             }
-            
+
             let ty = parser.parse_type_ref();
-            
+
             let default = if parser.check(TokenKind::Eq) {
                 parser.advance();
                 Some(parser.parse_expression())
             } else {
                 None
             };
-            
+
             let mut decorators = Vec::new();
             while parser.check(TokenKind::At) {
                 parser.advance(); // consume '@'
@@ -3731,13 +3753,13 @@ impl Parser {
                     span: dec_start.merge(dec_end),
                 });
             }
-            
+
             // Consume optional trailing newline or comma
             if parser.check(TokenKind::Comma) {
                 parser.advance();
             }
             parser.consume_newlines();
-            
+
             let fend = parser.previous_span();
             Some(EntityField {
                 name: fname,
@@ -3844,13 +3866,15 @@ impl Parser {
                         })
                     });
                 }
-                TokenKind::KwPreconditions | TokenKind::Ident if self.peek_text() == "require" || self.peek_text() == "preconditions" => {
+                TokenKind::KwPreconditions | TokenKind::Ident
+                    if self.peek_text() == "require" || self.peek_text() == "preconditions" =>
+                {
                     self.advance();
                     if self.check(TokenKind::Colon) {
                         self.advance();
                     }
                     self.consume_newlines();
-                    
+
                     preconditions = self.parse_block(|parser| {
                         if parser.check(TokenKind::Minus) {
                             parser.advance();
@@ -3860,13 +3884,15 @@ impl Parser {
                         Some(expr)
                     });
                 }
-                TokenKind::KwPostconditions | TokenKind::Ident if self.peek_text() == "ensure" || self.peek_text() == "postconditions" => {
+                TokenKind::KwPostconditions | TokenKind::Ident
+                    if self.peek_text() == "ensure" || self.peek_text() == "postconditions" =>
+                {
                     self.advance();
                     if self.check(TokenKind::Colon) {
                         self.advance();
                     }
                     self.consume_newlines();
-                    
+
                     postconditions = self.parse_block(|parser| {
                         if parser.check(TokenKind::Minus) {
                             parser.advance();
@@ -3883,7 +3909,7 @@ impl Parser {
             self.consume_newlines();
         }
         self.expect(TokenKind::Dedent);
-        
+
         let end = self.previous_span();
         Some(ActionDecl {
             name,
@@ -3901,20 +3927,20 @@ impl Parser {
         self.advance(); // consume 'rule'
 
         let name = self.advance().text;
-        
+
         if self.check(TokenKind::Ident) && self.peek_text() == "on" {
             self.advance();
         }
-        
+
         let target = self.advance().text;
         self.consume_newlines();
-        
+
         self.expect(TokenKind::Indent);
         self.consume_newlines();
         let condition = self.parse_expression();
         self.consume_newlines();
         self.expect(TokenKind::Dedent);
-        
+
         let end = self.previous_span();
         Some(RuleDecl {
             name,

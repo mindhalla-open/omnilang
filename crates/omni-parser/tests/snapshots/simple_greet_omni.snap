@@ -1,0 +1,85 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - greet
+  span:
+    start: 0
+    end: 17
+imports: []
+exports: []
+declarations:
+  - Service:
+      name: greetService
+      goal: Say hello to users
+      target: ~
+      constraints: []
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: Greet
+          inputs:
+            - name: name
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 168
+                  end: 174
+              default: ~
+              doc_comment: ~
+              span:
+                start: 163
+                end: 174
+          outputs:
+            - name: greeting
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 203
+                  end: 209
+              default: ~
+              doc_comment: ~
+              span:
+                start: 194
+                end: 209
+          preconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - name
+                    - start: 237
+                      end: 241
+                op: NotEq
+                right:
+                  Literal:
+                    String: ""
+                span:
+                  start: 237
+                  end: 247
+          postconditions: []
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Greets a user by name
+          span:
+            start: 129
+            end: 248
+      budget: ~
+      metrics: []
+      invariants: []
+      applies: []
+      visibility: Public
+      doc_comment: A simple greeting service
+      span:
+        start: 49
+        end: 248

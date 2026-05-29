@@ -1,0 +1,15 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "warning[E0301]: service 'selfCorrectingService' has no constraints — consider adding latency, reliability, or security constraints"
+  - "warning[E0902]: Logical Gap Detector: Operation 'Process' in service 'selfCorrectingService' has no preconditions defined. Input parameters might not be validated."
+  - "warning[E0903]: Logical Gap Detector: Operation 'Process' in service 'selfCorrectingService' has no postconditions defined. The output states are unconstrained."
+ir:
+  module_path: acme.testing.self_correction
+  types: []
+  services:
+    - selfCorrectingService
+  build_order:
+    - selfCorrectingService

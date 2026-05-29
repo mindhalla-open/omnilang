@@ -2,9 +2,21 @@
 name = "omni-lang"
 version = "0.11.0"
 description = "OmniLang — the specification language for AI-native development"
+# Pins the OmniLang grammar this project targets (indentation-based, brace-free).
+syntax_version = "0.2"
 
 [budget]
 max_total = 10.0
+
+# Pinned generation parameters for reproducible builds. The content-addressed
+# cache key folds these in, so changing the model or provider invalidates cached
+# artifacts. `temperature = 0` and a fixed seed maximize determinism where the
+# provider supports them.
+[generation]
+provider = "ollama"
+model = "qwen2.5-coder:7b"
+temperature = 0
+seed = 0
 
 [target.typescript.dependencies]
 "@prisma/client" = "^5.14.0"

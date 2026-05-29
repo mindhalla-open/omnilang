@@ -1,0 +1,23 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "warning[E0301]: service 'paymentService' has no constraints — consider adding latency, reliability, or security constraints"
+  - "warning[E0305]: Precondition 'Deposit amount must be strictly greater than zero' in operation 'paymentService.Deposit' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'New balance must increase exactly by the deposit amount' in operation 'paymentService.Deposit' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'paymentService.Deposit' has no test scenarios — consider adding tests for verification"
+  - "warning[E0305]: Precondition 'Account balance must be greater than or equal to the charge amount' in operation 'paymentService.Charge' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0305]: Precondition 'Account must be in Active status' in operation 'paymentService.Charge' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'If the charge is successful, the balance is decreased by the charge amount' in operation 'paymentService.Charge' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'paymentService.Charge' has no test scenarios — consider adding tests for verification"
+  - "warning[E0804]: Critical invariant 'balance_safety' in service 'paymentService' is natural-language and cannot be formally proven. Express it as a mathematical formula to gain a Z3 guarantee."
+ir:
+  module_path: acme.billing
+  types:
+    - accountId
+    - account
+  services:
+    - paymentService
+  build_order:
+    - paymentService

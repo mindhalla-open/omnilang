@@ -55,6 +55,7 @@ describe("SQL Generator - mapTypeToSql", () => {
 
   test("should resolve type aliases recursively in SQL mapping", () => {
     const ir: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },
@@ -99,6 +100,7 @@ describe("SQL Generator - mapTypeToSql", () => {
 describe("SQL Generator - generateSqlDdl", () => {
   test("should generate valid DDL SQL script", () => {
     const ir: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },

@@ -1,0 +1,63 @@
+name: "OmniLang"
+description: "Validate and (optionally) build OmniLang specs in CI, with a reproducible --frozen build and a cost report."
+author: "OmniLang"
+branding:
+  icon: "zap"
+  color: "purple"
+
+inputs:
+  path:
+    description: "Path to the .omni specs or project directory."
+    required: false
+    default: "."
+  command:
+    description: "What to run: 'check' (validate only), 'build' (generate + verify), or 'plan' (cost dry-run)."
+    required: false
+    default: "check"
+  target:
+    description: "Target language for 'build' (typescript | rust | python | go)."
+    required: false
+    default: "typescript"
+  frozen:
+    description: "For 'build': require cached artifacts (no LLM calls). Recommended in CI."
+    required: false
+    default: "true"
+  budget:
+    description: "Optional hard cost ceiling in dollars for 'build'."
+    required: false
+    default: ""
+
+outputs:
+  build-report:
+    description: "Path to build-report.json (for 'build')."
+    value: ${{ steps.run.outputs.report }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up OmniLang
+      uses: ./.github/actions/setup-omni
+
+    - name: Run OmniLang
+      id: run
+      shell: bash
+      run: |
+        set -euo pipefail
+        case "${{ inputs.command }}" in
+          check)
+            omni check "${{ inputs.path }}"
+            ;;
+          plan)
+            omni plan "${{ inputs.path }}"
+            ;;
+          build)
+            args=(build "${{ inputs.path }}" --target "${{ inputs.target }}")
+            [ "${{ inputs.frozen }}" = "true" ] && args+=(--frozen)
+            [ -n "${{ inputs.budget }}" ] && args+=(--budget "${{ inputs.budget }}")
+            omni "${args[@]}"
+            echo "report=build/build-report.json" >> "$GITHUB_OUTPUT"
+            ;;
+          *)
+            echo "::error::unknown command '${{ inputs.command }}'"; exit 1
+            ;;
+        esac

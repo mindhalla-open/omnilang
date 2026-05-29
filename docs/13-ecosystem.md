@@ -63,25 +63,24 @@ use @security/pci-dss-v4.{StrictCompliance, CardDataProtection}
 use @compliance/gdpr.{DataResidency, RightToErasure}
 use @patterns/rest-api.{StandardCRUD, Pagination, RateLimiting}
 
-service PaymentProcessor {
-  goal: "Process credit card payments securely"
+service PaymentProcessor
+  goal "Process credit card payments securely"
 
   // Apply community-authored constraint bundles
   apply: StrictCompliance
   apply: CardDataProtection
   apply: RateLimiting(100, 1min)
 
-  // The package contributes:
-  // - 47 specific constraints (encryption, tokenization, logging)
-  // - 23 test scenarios (SQL injection, XSS, data leakage)
-  // - Compliance checklist with 200+ items
-  // - Evidence requirements (quarterly pen test, annual audit)
-
   // Your service-specific additions
-  inputs: { ... }
-  outputs: { ... }
-  tests: [ ... ]
-}
+  inputs:
+    amount Money
+    token String
+  outputs:
+    result PaymentStatus
+  tests:
+    - scenario: "Normal payment"
+      given: valid_token()
+      expect: result == Success
 ```
 
 ### What the Community Contributes

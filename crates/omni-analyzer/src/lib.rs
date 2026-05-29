@@ -30,9 +30,14 @@ pub use ir::SpecIR;
 pub use symbols::SymbolTable;
 
 /// Diagnostic message produced by the analyzer.
+///
+/// Every diagnostic carries a stable `code` (e.g. `E0301`) so it can be
+/// referenced, documented (see `docs/18-error-codes.md`), and filtered
+/// programmatically. Codes are grouped by analysis phase.
 #[derive(Debug, Clone)]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
+    pub code: &'static str,
     pub message: String,
     pub span: omni_parser::Span,
 }
@@ -44,6 +49,42 @@ pub enum DiagnosticKind {
     Info,
 }
 
+impl Diagnostic {
+    /// Construct an error-level diagnostic with a stable code.
+    pub fn error(code: &'static str, message: impl Into<String>, span: omni_parser::Span) -> Self {
+        Self {
+            kind: DiagnosticKind::Error,
+            code,
+            message: message.into(),
+            span,
+        }
+    }
+
+    /// Construct a warning-level diagnostic with a stable code.
+    pub fn warning(
+        code: &'static str,
+        message: impl Into<String>,
+        span: omni_parser::Span,
+    ) -> Self {
+        Self {
+            kind: DiagnosticKind::Warning,
+            code,
+            message: message.into(),
+            span,
+        }
+    }
+
+    /// Construct an info-level diagnostic with a stable code.
+    pub fn info(code: &'static str, message: impl Into<String>, span: omni_parser::Span) -> Self {
+        Self {
+            kind: DiagnosticKind::Info,
+            code,
+            message: message.into(),
+            span,
+        }
+    }
+}
+
 impl std::fmt::Display for Diagnostic {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let prefix = match self.kind {
@@ -51,7 +92,7 @@ impl std::fmt::Display for Diagnostic {
             DiagnosticKind::Warning => "warning",
             DiagnosticKind::Info => "info",
         };
-        write!(f, "{}: {}", prefix, self.message)
+        write!(f, "{}[{}]: {}", prefix, self.code, self.message)
     }
 }
 
@@ -123,7 +164,9 @@ pub fn analyze_project(files: &[SourceFile]) -> (Option<SpecIR>, Vec<Diagnostic>
         let local_table = symbols::build_symbol_table(file, &mut local_diags);
         for (name, symbol) in local_table.iter() {
             // Built-in types are always public but we don't need to re-export them from user modules
-            if symbols::BUILTIN_TYPES.contains(&name.as_str()) || symbols::BUILTIN_TYPES.contains(&name.to_lowercase().as_str()) {
+            if symbols::BUILTIN_TYPES.contains(&name.as_str())
+                || symbols::BUILTIN_TYPES.contains(&name.to_lowercase().as_str())
+            {
                 continue;
             }
             // Check visibility of the local declaration
@@ -180,6 +223,7 @@ pub fn analyze_project(files: &[SourceFile]) -> (Option<SpecIR>, Vec<Diagnostic>
                             } else {
                                 diagnostics.push(Diagnostic {
                                     kind: DiagnosticKind::Error,
+                                    code: "E0001",
                                     message: format!(
                                         "symbol '{}' not found in module '{}'",
                                         item.name,
@@ -197,6 +241,7 @@ pub fn analyze_project(files: &[SourceFile]) -> (Option<SpecIR>, Vec<Diagnostic>
                 if !target_mod.is_empty() && target_mod[0] != "std" {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0002",
                         message: format!("module '{}' not found", target_mod.join(".")),
                         span: import.span,
                     });
@@ -227,7 +272,6 @@ pub fn analyze_project(files: &[SourceFile]) -> (Option<SpecIR>, Vec<Diagnostic>
 
     (Some(ir), diagnostics)
 }
-
 
 /// Convenience: parse + analyze in one step
 pub fn parse_and_analyze(source: &str) -> (Option<SpecIR>, Vec<Diagnostic>, Vec<ParseError>) {

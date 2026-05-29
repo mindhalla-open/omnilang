@@ -277,7 +277,7 @@ impl TokenKind {
             // "pipeline" => Some(TokenKind::KwPipeline),
             "workflow" => Some(TokenKind::KwWorkflow),
             "orchestrator" => Some(TokenKind::KwWorkflow),
-            // "agent" => Some(TokenKind::KwAgent),
+            "agent" => Some(TokenKind::KwAgent),
             "schema" => Some(TokenKind::KwSchema),
             "policy" => Some(TokenKind::KwPolicy),
             // "contract" => Some(TokenKind::KwContract),
@@ -336,10 +336,10 @@ impl TokenKind {
             // "visual_spec" => Some(TokenKind::KwVisualSpec),
             // "description" => Some(TokenKind::KwDescription),
             // "scope" => Some(TokenKind::KwScope),
-            // "capabilities" => Some(TokenKind::KwCapabilities),
-            // "boundaries" => Some(TokenKind::KwBoundaries),
-            // "tools" => Some(TokenKind::KwTools),
-            // "model" => Some(TokenKind::KwModel),
+            "capabilities" => Some(TokenKind::KwCapabilities),
+            "boundaries" => Some(TokenKind::KwBoundaries),
+            "tools" => Some(TokenKind::KwTools),
+            "model" => Some(TokenKind::KwModel),
 
             // Test keywords
             "tests" => Some(TokenKind::KwTests),
@@ -405,7 +405,7 @@ impl TokenKind {
                 // | TokenKind::KwComponent
                 // | TokenKind::KwPipeline
                 | TokenKind::KwWorkflow
-                // | TokenKind::KwAgent
+                | TokenKind::KwAgent
                 | TokenKind::KwSchema
                 | TokenKind::KwPolicy
                 // | TokenKind::KwContract
@@ -451,10 +451,10 @@ impl TokenKind {
                 // | TokenKind::KwVisualSpec
                 // | TokenKind::KwDescription
                 // | TokenKind::KwScope
-                // | TokenKind::KwCapabilities
-                // | TokenKind::KwBoundaries
-                // | TokenKind::KwTools
-                // | TokenKind::KwModel
+                | TokenKind::KwCapabilities
+                | TokenKind::KwBoundaries
+                | TokenKind::KwTools
+                | TokenKind::KwModel
                 | TokenKind::KwTests
                 | TokenKind::KwScenario
                 | TokenKind::KwProperty

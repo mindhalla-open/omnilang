@@ -31,16 +31,20 @@ AI code generators are prone to hallucinating when given completely free-form pr
 Here is how you can write both styles in the same specification file:
 
 ```omnilang
-service AccountService {
-  rpc Deposit(accountId: String, amount: Money) -> Money {
+service AccountService
+  operation Deposit
+    inputs:
+      accountId String
+      amount Money
+    outputs:
+      result Money
+
     preconditions:
       // 1. Natural Language (interpreted by LLM, turned into code checks & unit tests)
       - "Deposit amount must be strictly greater than zero"
       
       // 2. Formal Expression (statically checked by compiler / Z3 solver)
       - amount > 0
-  }
-}
 ```
 
 By leveraging this hybrid strategy, OmniLang specs remain incredibly clean, readable by non-developers, yet solid enough to guarantee production-grade code correctness.

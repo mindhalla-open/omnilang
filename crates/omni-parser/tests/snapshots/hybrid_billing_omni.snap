@@ -1,0 +1,249 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - billing
+  span:
+    start: 0
+    end: 19
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: accountId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 38
+            end: 44
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 21
+        end: 44
+  - Type:
+      name: account
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: id
+              ty:
+                name: accountId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 73
+                  end: 82
+              default: ~
+              doc_comment: ~
+              span:
+                start: 70
+                end: 82
+            - name: balance
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 93
+                  end: 98
+              default: ~
+              doc_comment: ~
+              span:
+                start: 85
+                end: 98
+            - name: status
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 108
+                  end: 114
+              default: ~
+              doc_comment: ~
+              span:
+                start: 101
+                end: 114
+          span:
+            start: 67
+            end: 116
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 46
+        end: 116
+  - Service:
+      name: paymentService
+      goal: "Handle billing account deposits, charges, and refunds safely"
+      target: ~
+      constraints: []
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: Deposit
+          inputs:
+            - name: accountId
+              ty:
+                name: accountId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 296
+                  end: 305
+              default: ~
+              doc_comment: ~
+              span:
+                start: 286
+                end: 305
+            - name: amount
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 319
+                  end: 324
+              default: ~
+              doc_comment: ~
+              span:
+                start: 312
+                end: 324
+          outputs:
+            - name: result
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 351
+                  end: 356
+              default: ~
+              doc_comment: ~
+              span:
+                start: 344
+                end: 356
+          preconditions:
+            - Literal:
+                String: Deposit amount must be strictly greater than zero
+          postconditions:
+            - Literal:
+                String: New balance must increase exactly by the deposit amount
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Deposits money into the account
+          span:
+            start: 250
+            end: 525
+        - name: Charge
+          inputs:
+            - name: accountId
+              ty:
+                name: accountId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 611
+                  end: 620
+              default: ~
+              doc_comment: ~
+              span:
+                start: 601
+                end: 620
+            - name: amount
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 634
+                  end: 639
+              default: ~
+              doc_comment: ~
+              span:
+                start: 627
+                end: 639
+          outputs:
+            - name: success
+              ty:
+                name: bool
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 667
+                  end: 671
+              default: ~
+              doc_comment: ~
+              span:
+                start: 659
+                end: 671
+          preconditions:
+            - Literal:
+                String: Account balance must be greater than or equal to the charge amount
+            - Literal:
+                String: Account must be in Active status
+          postconditions:
+            - Literal:
+                String: "If the charge is successful, the balance is decreased by the charge amount"
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Charges the account for a purchase
+          span:
+            start: 566
+            end: 919
+      budget: ~
+      metrics: []
+      invariants:
+        - BinaryOp:
+            left:
+              Identifier:
+                - balance_safety
+                - start: 937
+                  end: 951
+            op: Eq
+            right:
+              Literal:
+                String: account.balance >= 0
+            span:
+              start: 937
+              end: 975
+        - BinaryOp:
+            left:
+              Identifier:
+                - audit_logging
+                - start: 982
+                  end: 995
+            op: Eq
+            right:
+              Literal:
+                String: All successful transactions must generate an audit trail record
+            span:
+              start: 982
+              end: 1062
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 116
+        end: 1063
