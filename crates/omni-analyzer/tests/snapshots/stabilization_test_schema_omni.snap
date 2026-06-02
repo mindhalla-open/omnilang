@@ -1,0 +1,13 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "info[E0704]: Schema Validation: Entity 'user' does not enable Row Level Security (RLS). Consider adding @row_level_security decorator."
+  - "info[E0705]: Schema Validation: Entity 'user' does not enable soft deletes. Deletes will be permanent."
+ir:
+  module_path: acme.stabilization.test
+  types:
+    - userId
+  services: []
+  build_order: []

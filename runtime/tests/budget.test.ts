@@ -1,5 +1,31 @@
-import { BudgetTracker, estimateBuildCost, DEFAULT_BUDGET, ModelPricing } from "../src/budget";
+import {
+  BudgetTracker,
+  estimateBuildCost,
+  modelForTier,
+  DEFAULT_BUDGET,
+  ModelPricing,
+} from "../src/budget";
 import { SpecIR } from "../src/types";
+
+describe("model tiering", () => {
+  it("maps each tier to a model in the pricing table", () => {
+    expect(modelForTier("CheapFast")).toBeTruthy();
+    expect(modelForTier("Balanced")).toBeTruthy();
+    expect(modelForTier("SmartExpensive")).toBe("claude-opus-4-20250514");
+  });
+
+  it("downgrades to the cheapest tier when the budget is nearly exhausted", () => {
+    const tracker = new BudgetTracker({ ...DEFAULT_BUDGET, maxTotal: 1.0 });
+    tracker.recordUsage("t1", "S", "claude-opus-4-20250514", {
+      inputTokens: 40000,
+      outputTokens: 6000,
+      totalTokens: 46000,
+    });
+    // Heavy spend against a $1.00 budget → remaining < 0.5 → CheapFast.
+    expect(tracker.selectModelTier()).toBe("CheapFast");
+    expect(tracker.selectModel()).toBe(modelForTier("CheapFast"));
+  });
+});
 
 describe("BudgetTracker", () => {
   test("should record token usage and calculate cost for sonnet", () => {
@@ -174,6 +200,7 @@ describe("BudgetTracker", () => {
 describe("estimateBuildCost", () => {
   test("should estimate build cost from SpecIR stats", () => {
     const mockIr: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },
@@ -186,6 +213,7 @@ describe("estimateBuildCost", () => {
         {
           name: "UserService",
           goal: null,
+          target: null,
           operation_count: 2,
           operation_names: ["getUser", "createUser"],
           constraint_count: 0,
@@ -200,6 +228,7 @@ describe("estimateBuildCost", () => {
         {
           name: "BillingService",
           goal: null,
+          target: null,
           operation_count: 2,
           operation_names: ["charge", "refund"],
           constraint_count: 0,
@@ -249,6 +278,7 @@ describe("estimateBuildCost", () => {
 
   test("should handle unknown tiers gracefully", () => {
     const mockIr: SpecIR = {
+      ir_version: "1",
       module_path: ["test"],
       source_file: {
         module: { path: ["test"], span: { start: 0, end: 0 } },

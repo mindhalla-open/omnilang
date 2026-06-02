@@ -142,8 +142,8 @@ The IDE analyzes each `goal` field and flags when the natural language is **too 
 
 ```
 ┌──────────────────────────────────────────────────────────┐
-│ service DataProcessor {                                   │
-│   goal: "process data"                                    │
+│ service DataProcessor                                     │
+│   goal "process data"                                     │
 │          ▲                                                │
 │          │                                                │
 │   ┌──────┴────────────────────────────────────────────┐   │
@@ -162,7 +162,6 @@ The IDE analyzes each `goal` field and flags when the natural language is **too 
 │   │                                                    │   │
 │   │ [Suggest Improvements] [Ignore]                    │   │
 │   └────────────────────────────────────────────────────┘   │
-│ }                                                         │
 └──────────────────────────────────────────────────────────┘
 ```
 
@@ -249,8 +248,8 @@ View referenced evidence directly in the editor:
 
 ```
 ┌─────────────────────────────────────────────────┐
-│ service Checkout {                               │
-│   evidence:                                      │
+│ service Checkout                                │
+│   evidence                                       │
 │     - @docs/payment_flow.png  ← [Preview] 🖼️    │
 │                                                  │
 │       ┌─────────────────────────┐               │
@@ -259,7 +258,6 @@ View referenced evidence directly in the editor:
 │       └─────────────────────────┘               │
 │                                                  │
 │     - @traces/checkout.json  ← [Trace viewer] 📊│
-│ }                                                │
 └─────────────────────────────────────────────────┘
 ```
 

@@ -88,7 +88,7 @@ Build succeeded. Confidence: High. Cost: $0.12. Duration: 1m 42s.
 
 ## Installation
 
-> ⚠️ OmniLang is in early development. The CLI currently supports `omni check` (spec validation).
+> ⚠️ OmniLang is in early development. The CLI supports `omni check`, `omni plan`, `omni build` (TypeScript, Rust, Python, Go targets), `omni init`, `omni fmt`, and `omni verify`. Registry commands (`publish`, `install`, `search`) currently operate against a local mock registry.
 
 ```bash
 # From source (requires Rust 1.85+)

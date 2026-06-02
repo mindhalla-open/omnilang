@@ -1,0 +1,16 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "info[E0307]: operation 'transferService.Withdraw' has no test scenarios — consider adding tests for verification"
+  - "warning[E0305]: Precondition 'Reservation must be confirmed within the checkout session' in operation 'transferService.Reserve' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'transferService.Reserve' has no test scenarios — consider adding tests for verification"
+  - "info[E0801]: Formal Verification: Service 'transferService' formally verified (2 obligation(s) proven). Proof certificates generated under '.omni-cache/proofs/'.\n  - Operation 'Withdraw': proof verified by Z3 (unsat)\n  - Operation 'Reserve': proof verified by Z3 (unsat) (1 natural-language condition(s) deferred to generated tests)"
+ir:
+  module_path: demo.formal
+  types: []
+  services:
+    - transferService
+  build_order:
+    - transferService

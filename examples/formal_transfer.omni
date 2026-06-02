@@ -1,0 +1,40 @@
+module demo.formal
+
+/// Demonstrates machine-checked contracts: the `formal_verification`
+/// constraint opts every operation's formal pre/postconditions into Z3
+/// proof obligations. Run `omni check examples/formal_transfer.omni` —
+/// proof certificates land in `.omni-cache/proofs/`.
+service transferService
+  goal "Move money between accounts with machine-proven safety bounds"
+
+  constraints:
+    - formal_verification
+
+  /// Withdraws an amount; Z3 proves the balance can never go negative
+  /// given the preconditions (balance >= amount && amount > 0 ⇒ balance >= 0).
+  operation Withdraw
+    inputs:
+      balance money
+      amount money
+    outputs:
+      success bool
+    preconditions:
+      - amount > 0
+      - balance >= amount
+    postconditions:
+      - balance >= 0
+
+  /// Reserves inventory; the formal bound is proven, the business rule
+  /// stays natural-language and is covered by generated tests instead.
+  operation Reserve
+    inputs:
+      stock int
+      quantity int
+    outputs:
+      success bool
+    preconditions:
+      - quantity > 0
+      - stock >= quantity
+      - "Reservation must be confirmed within the checkout session"
+    postconditions:
+      - stock >= 0

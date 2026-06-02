@@ -1,27 +1,93 @@
 import * as fs from "fs";
 import * as path from "path";
+import * as crypto from "crypto";
 import { spawnSync } from "child_process";
+import Ajv from "ajv";
 import pc from "picocolors";
 import { getLLMProvider } from "./providers";
 import { CodeGenAgent } from "./agents/codegen";
 import { VerificationRunner } from "./verify";
 import { AgentOptimizer, StrategyABTester } from "./improve";
 import { getSystemPrompt, getUserPrompt, formatTypeDecl } from "./prompts/codegen";
+import { ContentAddressedCache, CacheEntry } from "./storage/cache";
+import { enumerateContracts, checkContractCoverage } from "./contracts";
+import { BudgetTracker, DEFAULT_BUDGET, MODEL_PRICING } from "./budget";
 import { SpecIR } from "./types";
+
+/** Rough token estimate from character length (~4 chars/token). */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 4);
+}
 import { SchemaGeneratorRegistry } from "./plugins/base";
 import { PrismaSchemaGenerator } from "./plugins/prisma";
 import { SqlSchemaGenerator } from "./plugins/sql";
 import { WorkflowGenerator } from "./testing/workflows";
+import { SecurityRunner } from "./testing/security";
 
 // Register default schema generator plugins
 SchemaGeneratorRegistry.register(new PrismaSchemaGenerator());
 SchemaGeneratorRegistry.register(new SqlSchemaGenerator());
+
+/// Spec IR schema version this runtime understands. Must stay in sync with the
+/// analyzer's CURRENT_IR_VERSION. Loading IR produced by a newer schema is
+/// rejected rather than silently misinterpreted.
+export const SUPPORTED_IR_VERSION = "1";
+
+/// Validates that a loaded IR document is compatible with this runtime.
+export function assertIrVersion(ir: SpecIR, source: string): void {
+  // Tolerate IR predating version stamping, but never a known mismatch.
+  if (ir.ir_version && ir.ir_version !== SUPPORTED_IR_VERSION) {
+    throw new Error(
+      `Incompatible Spec IR version in ${source}: got "${ir.ir_version}", ` +
+        `this runtime supports "${SUPPORTED_IR_VERSION}". Rebuild with a matching omni toolchain.`,
+    );
+  }
+}
+
+/// JSON Schema for the Spec IR, generated from the Rust types (see
+/// crates/omni-analyzer/tests/export_types.rs). Loaded lazily and compiled once.
+let compiledIrValidator:
+  | (((data: unknown) => boolean) & { errors?: any })
+  | undefined;
+
+function getIrValidator() {
+  if (!compiledIrValidator) {
+    // Resolve the schema both when running compiled (dist/ir.schema.json, copied
+    // by the build script) and from source (jest/ts-node → src/ir.schema.json).
+    const candidates = [
+      path.join(__dirname, "ir.schema.json"),
+      path.join(__dirname, "..", "src", "ir.schema.json"),
+    ];
+    const schemaPath = candidates.find((p) => fs.existsSync(p)) ?? candidates[0];
+    const schema = JSON.parse(fs.readFileSync(schemaPath, "utf8"));
+    // `logger: false` silences ajv's "unknown format" notes for the numeric
+    // formats schemars emits (uint/int64/double), which ajv does not enforce.
+    const ajv = new Ajv({ allErrors: true, strict: false, logger: false });
+    compiledIrValidator = ajv.compile(schema);
+  }
+  return compiledIrValidator;
+}
+
+/// Structurally validates a loaded IR document against the generated JSON Schema.
+/// Rejects malformed/partial IR fail-fast, before any generation work begins.
+export function validateIrSchema(ir: unknown, source: string): void {
+  const validate = getIrValidator();
+  if (!validate(ir)) {
+    const first = validate.errors?.[0];
+    const where = first ? `${first.instancePath || "<root>"} ${first.message}` : "unknown";
+    throw new Error(`Spec IR in ${source} does not match the IR schema: ${where}`);
+  }
+}
 
 export interface OrchestratorOptions {
   irPath: string;
   outputDir: string;
   target: string;
   fullStack?: boolean;
+  /** Reproducible mode: a cache miss is a hard error instead of an LLM call. */
+  frozen?: boolean;
+  /** Hard cost ceiling in dollars; the build stops once exceeded. */
+  budget?: number;
 }
 
 export class Orchestrator {
@@ -29,6 +95,11 @@ export class Orchestrator {
   private outputDir: string;
   private target: string;
   private fullStack: boolean;
+  private frozen: boolean;
+  private budget?: number;
+  /// Build provenance: ties the report to the exact IR + generation parameters,
+  /// making each build auditable (spec hash, IR version, model/seed).
+  private provenance?: { ir_version: string; ir_hash: string; generation: string };
 
   constructor(options: OrchestratorOptions) {
     this.irPath = options.irPath;
@@ -38,13 +109,64 @@ export class Orchestrator {
     }
     this.target = options.target;
     this.fullStack = !!options.fullStack;
+    this.frozen = !!options.frozen;
+    this.budget = options.budget;
   }
 
   public async run(): Promise<void> {
     // 1. Load Spec IR JSON
     const irContent = fs.readFileSync(this.irPath, "utf8");
     const ir: SpecIR = JSON.parse(irContent);
+    assertIrVersion(ir, this.irPath);
+    validateIrSchema(ir, this.irPath);
 
+    // Partition services by effective target (per-service `target` override, else
+    // the build-wide target). A single target builds in place (unchanged
+    // behavior); multiple targets build into per-target subdirectories.
+    const serviceNames =
+      ir.build_order && ir.build_order.length > 0
+        ? ir.build_order
+        : (ir.services || []).map((s: any) => s.name);
+    const targetOf = (name: string): string => {
+      const d = ir.source_file.declarations.find(
+        (x: any) => "Service" in x && x.Service.name === name,
+      );
+      const t = d && "Service" in d ? (d as any).Service.target : undefined;
+      return (t || this.target).toLowerCase();
+    };
+    const groups = new Map<string, string[]>();
+    for (const name of serviceNames) {
+      const t = targetOf(name);
+      if (!groups.has(t)) groups.set(t, []);
+      groups.get(t)!.push(name);
+    }
+
+    if (groups.size <= 1) {
+      await this.buildPass(ir, irContent, null);
+      return;
+    }
+
+    console.log(pc.yellow(`   Mixed-target build → ${[...groups.keys()].join(", ")}`));
+    const baseOut = this.outputDir;
+    const baseTarget = this.target;
+    for (const [t, names] of groups) {
+      this.target = t;
+      this.outputDir = path.join(baseOut, t);
+      console.log(pc.cyan(`\n   ── Target '${t}' → ${this.outputDir} ──`));
+      await this.buildPass(ir, irContent, new Set(names));
+    }
+    this.target = baseTarget;
+    this.outputDir = baseOut;
+    console.log(pc.green(`✅ Mixed-target build complete (${groups.size} targets).`));
+  }
+
+  /** Builds a single target into `this.outputDir`. `only` restricts which
+   *  services are generated (null = all); used by mixed-target dispatch. */
+  private async buildPass(
+    ir: SpecIR,
+    irContent: string,
+    only: Set<string> | null,
+  ): Promise<void> {
     console.log(pc.yellow(`   Initializing build directory at: ${this.outputDir}`));
     await this.initializeBuildDirectory(ir);
 
@@ -58,6 +180,66 @@ export class Orchestrator {
     const agent = new CodeGenAgent(provider);
     const optimizer = new AgentOptimizer();
 
+    // Accumulates a structured, machine-readable record of the build.
+    const startedAt = Date.now();
+    const serviceReports: Array<{
+      name: string;
+      success: boolean;
+      attempts: number;
+      error?: string;
+      cached?: boolean;
+    }> = [];
+
+    // Content-addressed cache for reproducible/incremental builds. The cache key
+    // for a service folds in everything that determines its generated output:
+    // the prompts (which encode the relevant IR), the target, and the pinned
+    // generation parameters (provider + model). An unchanged service is reused
+    // from cache without any LLM call.
+    const cache = new ContentAddressedCache(".");
+    const genProvider = process.env.OMNI_LLM_PROVIDER || "anthropic";
+    const genModel =
+      process.env.OMNI_MODEL ||
+      process.env.OLLAMA_MODEL ||
+      process.env.ANTHROPIC_MODEL ||
+      "default";
+    const genParams = `provider=${genProvider};model=${genModel};temp=0`;
+    this.provenance = {
+      ir_version: ir.ir_version ?? "unknown",
+      ir_hash: crypto.createHash("sha256").update(irContent).digest("hex").slice(0, 16),
+      generation: genParams,
+    };
+    let llmCalls = 0;
+    let cacheHits = 0;
+    const lockEntries: Array<{ name: string; key: string; files: number }> = [];
+
+    // Budget tracking: every LLM call's (estimated) token cost is accumulated and
+    // checked against a hard ceiling. Cache hits accrue no cost but their avoided
+    // cost is estimated for the savings report.
+    const budgetTracker = new BudgetTracker(
+      this.budget !== undefined ? { ...DEFAULT_BUDGET, maxTotal: this.budget } : DEFAULT_BUDGET,
+    );
+    let cacheSavingsUsd = 0;
+
+    // Contract coverage: every declared pre/postcondition and invariant must be
+    // enforced by a marked check (`// @omni:contract <id>`) in the generated
+    // code. Enabled by default; disable with OMNI_ENFORCE_CONTRACTS=false.
+    const enforceContracts = process.env.OMNI_ENFORCE_CONTRACTS !== "false";
+    const contractReport: Array<{ service: string; covered: string[]; uncovered: string[] }> = [];
+    const serviceAst = (name: string): any => {
+      const d = ir.source_file.declarations.find(
+        (x: any) => "Service" in x && x.Service.name === name,
+      );
+      return d && "Service" in d ? (d as any).Service : undefined;
+    };
+    const recordCoverage = (name: string, contents: string[]): void => {
+      const svc = serviceAst(name);
+      if (!svc) return;
+      const contracts = enumerateContracts(svc);
+      if (contracts.length === 0) return;
+      const { covered, uncovered } = checkContractCoverage(contracts, contents);
+      contractReport.push({ service: name, covered, uncovered });
+    };
+
     // 4. Generate code for each service in build order (topological sort)
     console.log(pc.yellow(`   Executing code generation flow...`));
     const buildOrder: string[] = ir.build_order || [];
@@ -70,23 +252,141 @@ export class Orchestrator {
     }
 
     for (const serviceName of buildOrder) {
+      // In a mixed-target build, this pass only handles its target's services.
+      if (only && !only.has(serviceName)) continue;
+
       // Route strategy via A/B testing
       const { strategy, model } = StrategyABTester.route(serviceName);
+
+      // Cache lookup: reuse a previously generated+verified service verbatim if
+      // its prompts and generation parameters are unchanged. No LLM call.
+      const specContent =
+        getSystemPrompt(this.target) +
+        "\n" +
+        getUserPrompt(serviceName, ir, this.target) +
+        "\n" +
+        genParams;
+      const cacheKey = cache.cacheKey(serviceName, this.target, specContent);
+      const cached = cache.get(cacheKey);
+      if (cached) {
+        for (const f of cached.files) {
+          const dest = path.join(this.outputDir, f.path);
+          fs.mkdirSync(path.dirname(dest), { recursive: true });
+          fs.writeFileSync(dest, f.content, "utf8");
+          generatedFiles.push(dest);
+        }
+        // Cached files skip generateService(), so the Rust module registration
+        // it performs must be replayed here — mod.rs starts empty every build.
+        if (this.target === "rust") {
+          CodeGenAgent.updateRustModFile(this.outputDir, serviceName);
+        }
+        cacheHits++;
+        serviceReports.push({ name: serviceName, success: true, attempts: 0, cached: true });
+        lockEntries.push({ name: serviceName, key: cacheKey, files: cached.files.length });
+        recordCoverage(serviceName, cached.files.map((f) => f.content));
+        // Estimate the LLM cost avoided by this cache hit.
+        const pricing = MODEL_PRICING[genModel];
+        if (pricing) {
+          const inTok = estimateTokens(specContent);
+          const outTok = estimateTokens(cached.files.map((f) => f.content).join("\n"));
+          cacheSavingsUsd +=
+            (inTok / 1000) * pricing.inputPer1kTokens +
+            (outTok / 1000) * pricing.outputPer1kTokens;
+        }
+        console.log(`   [Cache] Service ${pc.cyan(serviceName)} reused from cache (no LLM call).`);
+        continue;
+      }
+
+      if (this.frozen) {
+        console.error(
+          pc.red(
+            `❌ --frozen: service '${serviceName}' is not in the cache; refusing to call the LLM.`,
+          ),
+        );
+        serviceReports.push({
+          name: serviceName,
+          success: false,
+          attempts: 0,
+          error: "frozen build: cache miss",
+        });
+        this.writeBuildReport(serviceReports, false, startedAt, undefined, {
+          llmCalls,
+          cacheHits,
+        });
+        process.exit(1);
+      }
+
       console.log(`   [Strategy Router] Service ${pc.cyan(serviceName)} routed to strategy: ${pc.cyan(strategy)} (Model: ${pc.cyan(model)})`);
 
       let success = false;
       let attempts = 0;
       const maxAttempts = 3;
       const errors: string[] = [];
+      // Anti-regression: files written by the previous (failed) attempt are
+      // removed before the next one, so a differently-cased or renamed file from
+      // an earlier attempt cannot linger and corrupt verification (e.g. a
+      // case-insensitive filesystem seeing both Foo.ts and foo.ts).
+      let prevAttemptFiles: string[] = [];
 
       while (!success && attempts < maxAttempts) {
         attempts++;
         if (attempts > 1) {
           console.log(pc.yellow(`   Self-Correction Loop: Attempt ${attempts}/${maxAttempts} for service ${serviceName}...`));
+          for (const stale of prevAttemptFiles) {
+            try {
+              if (fs.existsSync(stale)) fs.rmSync(stale, { force: true });
+            } catch {
+              // best-effort cleanup
+            }
+          }
         }
 
         const optimizedInstructions = optimizer.getOptimizedInstructions(serviceName, errors);
+        llmCalls++;
         const result = await agent.generateService(serviceName, ir, this.outputDir, this.target, optimizedInstructions, model);
+        prevAttemptFiles = result.files;
+
+        // Record (estimated) token cost of this LLM call and enforce the budget.
+        const inputTokens = estimateTokens(specContent + optimizedInstructions);
+        const outputTokens = estimateTokens(
+          result.files
+            .map((f) => {
+              try {
+                return fs.readFileSync(f, "utf8");
+              } catch {
+                return "";
+              }
+            })
+            .join("\n"),
+        );
+        budgetTracker.recordUsage(`${serviceName}#${attempts}`, serviceName, model, {
+          inputTokens,
+          outputTokens,
+          totalTokens: inputTokens + outputTokens,
+        });
+        if (budgetTracker.isOverBudget()) {
+          console.error(
+            pc.red(
+              `❌ Budget exceeded: $${budgetTracker.getTotalCost().toFixed(4)} of $${this.budget?.toFixed(2) ?? DEFAULT_BUDGET.maxTotal.toFixed(2)} limit. Stopping.`,
+            ),
+          );
+          serviceReports.push({
+            name: serviceName,
+            success: false,
+            attempts,
+            error: "budget exceeded",
+          });
+          this.writeBuildReport(serviceReports, false, startedAt, undefined, {
+            llmCalls,
+            cacheHits,
+            contracts: contractReport,
+            cost: budgetTracker.getTotalCost(),
+            tokens: budgetTracker.getTotalTokens().totalTokens,
+            budgetLimit: budgetTracker.getRemainingBudget() + budgetTracker.getTotalCost(),
+            cacheSavingsUsd,
+          });
+          process.exit(1);
+        }
 
         // Run Verification to check if compiler & tests pass
         const currentServiceFiles = result.files;
@@ -99,7 +399,32 @@ export class Orchestrator {
 
         if (report.success) {
           success = true;
+          serviceReports.push({ name: serviceName, success: true, attempts });
           generatedFiles.push(...currentServiceFiles);
+
+          // Store the verified output in the content-addressed cache so an
+          // unchanged future build reuses it without an LLM call.
+          try {
+            const cacheFiles = currentServiceFiles.map((abs) => ({
+              path: path.relative(this.outputDir, abs),
+              content: fs.readFileSync(abs, "utf8"),
+            }));
+            const entry: CacheEntry = {
+              hash: cacheKey,
+              serviceName,
+              target: this.target,
+              files: cacheFiles,
+              timestamp: Date.now(),
+              model,
+              tokensUsed: 0,
+            };
+            cache.put(cacheKey, entry);
+            lockEntries.push({ name: serviceName, key: cacheKey, files: cacheFiles.length });
+            recordCoverage(serviceName, cacheFiles.map((f) => f.content));
+          } catch {
+            // Caching is best-effort; never fail a successful build over it.
+          }
+
           // Log successful trace
           optimizer.logTrace({
             serviceName,
@@ -129,9 +454,57 @@ export class Orchestrator {
             console.error(pc.red(`❌ Self-correction failed for service ${serviceName} after ${maxAttempts} attempts.`));
             console.error(pc.red(`   Last compilation/test error:`));
             console.error(pc.dim(errorMsg));
+            serviceReports.push({
+              name: serviceName,
+              success: false,
+              attempts,
+              error: errorMsg,
+            });
+            this.writeBuildReport(serviceReports, false, startedAt, undefined, {
+              llmCalls,
+              cacheHits,
+              contracts: contractReport,
+              cost: budgetTracker.getTotalCost(),
+              tokens: budgetTracker.getTotalTokens().totalTokens,
+              budgetLimit: this.budget ?? DEFAULT_BUDGET.maxTotal,
+              cacheSavingsUsd,
+            });
             process.exit(1);
           }
         }
+      }
+    }
+
+    // Contract coverage gate: fail the build if any declared contract lacks an
+    // executable, marked check in the generated code.
+    if (enforceContracts) {
+      const uncovered = contractReport.flatMap((r) =>
+        r.uncovered.map((id) => ({ service: r.service, id })),
+      );
+      if (uncovered.length > 0) {
+        console.error(
+          pc.red(
+            `❌ Contract coverage failed: ${uncovered.length} declared contract(s) have no enforcing check.`,
+          ),
+        );
+        for (const u of uncovered) {
+          console.error(pc.dim(`     uncovered: ${u.id}`));
+        }
+        console.error(
+          pc.dim(
+            "   Mark the enforcing line with `// @omni:contract <id>`, or set OMNI_ENFORCE_CONTRACTS=false to disable.",
+          ),
+        );
+        this.writeBuildReport(serviceReports, false, startedAt, undefined, {
+          llmCalls,
+          cacheHits,
+          contracts: contractReport,
+          cost: budgetTracker.getTotalCost(),
+          tokens: budgetTracker.getTotalTokens().totalTokens,
+          budgetLimit: this.budget ?? DEFAULT_BUDGET.maxTotal,
+          cacheSavingsUsd,
+        });
+        process.exit(1);
       }
     }
 
@@ -212,7 +585,25 @@ describe("${w.name}StateMachine", () => {
     const report = verifier.verify();
 
     if (report.success) {
-      console.log(pc.green(`✅ Build and verification completed successfully!`));
+      // Defensive SAST scan of the generated code → SARIF artifact in .evidence/.
+      // Report-only: it surfaces issues without failing an otherwise-green build.
+      const security = new SecurityRunner().runSecurityScan(this.outputDir);
+      this.writeBuildReport(serviceReports, true, startedAt, undefined, {
+        llmCalls,
+        cacheHits,
+        contracts: contractReport,
+        cost: budgetTracker.getTotalCost(),
+        tokens: budgetTracker.getTotalTokens().totalTokens,
+        budgetLimit: this.budget ?? DEFAULT_BUDGET.maxTotal,
+        cacheSavingsUsd,
+        securityIssues: security.issues.length,
+      });
+      this.writeLockfile(lockEntries, genParams);
+      console.log(
+        pc.green(
+          `✅ Build and verification completed successfully! (LLM calls: ${llmCalls}, cache hits: ${cacheHits}, cost: $${budgetTracker.getTotalCost().toFixed(4)})`,
+        ),
+      );
       console.log(pc.green(`   All generated tests passed successfully.`));
 
       if (this.fullStack) {
@@ -234,11 +625,116 @@ describe("${w.name}StateMachine", () => {
         console.error(pc.red(`   Test Failure Output:`));
         console.error(pc.dim(report.testError));
       }
+      this.writeBuildReport(
+        serviceReports,
+        false,
+        startedAt,
+        { typeCheckError: report.typeCheckError, testError: report.testError },
+        {
+          llmCalls,
+          cacheHits,
+          contracts: contractReport,
+          cost: budgetTracker.getTotalCost(),
+          tokens: budgetTracker.getTotalTokens().totalTokens,
+          budgetLimit: this.budget ?? DEFAULT_BUDGET.maxTotal,
+          cacheSavingsUsd,
+        },
+      );
       process.exit(1);
     }
   }
 
+  /// Writes `omni.lock` recording the content-addressed cache key per service
+  /// and the pinned generation parameters, so a `--frozen` build can reproduce
+  /// the exact artifacts without contacting an LLM.
+  private writeLockfile(
+    entries: Array<{ name: string; key: string; files: number }>,
+    genParams: string,
+  ): void {
+    const lock = {
+      lockfile_version: 1,
+      target: this.target,
+      generation: genParams,
+      services: entries,
+      generated_at: new Date().toISOString(),
+    };
+    try {
+      fs.writeFileSync("omni.lock", JSON.stringify(lock, null, 2) + "\n", "utf8");
+    } catch {
+      // Best-effort; do not fail the build over lockfile write.
+    }
+  }
+
+  /// Writes a machine-readable build report to `<output>/build-report.json` so
+  /// CI and tooling can consume the outcome (success, per-service attempts,
+  /// duration, retries) without scraping console output.
+  private writeBuildReport(
+    services: Array<{
+      name: string;
+      success: boolean;
+      attempts: number;
+      error?: string;
+      cached?: boolean;
+    }>,
+    success: boolean,
+    startedAt: number,
+    verification?: { typeCheckError?: string; testError?: string },
+    cacheStats?: {
+      llmCalls: number;
+      cacheHits: number;
+      contracts?: Array<{ service: string; covered: string[]; uncovered: string[] }>;
+      cost?: number;
+      tokens?: number;
+      budgetLimit?: number;
+      cacheSavingsUsd?: number;
+      securityIssues?: number;
+    },
+  ): void {
+    const contracts = cacheStats?.contracts ?? [];
+    const report = {
+      success,
+      target: this.target,
+      provenance: this.provenance ?? null,
+      duration_ms: Date.now() - startedAt,
+      service_count: services.length,
+      total_attempts: services.reduce((sum, s) => sum + s.attempts, 0),
+      retried_services: services.filter((s) => s.attempts > 1).length,
+      llm_calls: cacheStats?.llmCalls ?? null,
+      cache_hits: cacheStats?.cacheHits ?? null,
+      cost_usd: cacheStats?.cost ?? null,
+      total_tokens: cacheStats?.tokens ?? null,
+      budget_limit_usd: cacheStats?.budgetLimit ?? null,
+      cache_savings_usd: cacheStats?.cacheSavingsUsd ?? null,
+      security_issues: cacheStats?.securityIssues ?? null,
+      contracts_covered: contracts.reduce((n, c) => n + c.covered.length, 0),
+      contracts_uncovered: contracts.reduce((n, c) => n + c.uncovered.length, 0),
+      contracts,
+      services,
+      verification: verification ?? null,
+      generated_at: new Date().toISOString(),
+    };
+    try {
+      if (!fs.existsSync(this.outputDir)) {
+        fs.mkdirSync(this.outputDir, { recursive: true });
+      }
+      fs.writeFileSync(
+        path.join(this.outputDir, "build-report.json"),
+        JSON.stringify(report, null, 2) + "\n",
+        "utf8",
+      );
+    } catch {
+      // A report-writing failure must not mask the build outcome.
+    }
+  }
+
   private async initializeBuildDirectory(ir: SpecIR): Promise<void> {
+    // Start every build from a clean output directory so stale artifacts from a
+    // previous build (e.g. services no longer in the spec) cannot pollute
+    // verification. The output directory holds only generated code.
+    if (fs.existsSync(this.outputDir)) {
+      fs.rmSync(this.outputDir, { recursive: true, force: true });
+    }
+
     if (this.target === "rust") {
       await this.initializeRustDirectory(ir);
     } else if (this.target === "python") {

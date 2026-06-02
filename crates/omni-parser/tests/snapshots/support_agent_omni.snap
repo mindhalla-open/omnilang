@@ -1,0 +1,132 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - support
+  span:
+    start: 0
+    end: 19
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: orderId
+      type_params: []
+      kind:
+        Alias:
+          name: uuid
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 36
+            end: 40
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 21
+        end: 40
+  - Type:
+      name: orderSummary
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 61
+            end: 67
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 41
+        end: 67
+  - Agent:
+      name: customerSupportAgent
+      goal: Handle tier-1 customer support inquiries
+      capabilities:
+        - answer_faq
+        - look_up_order_status
+      boundaries:
+        - kind: Cannot
+          expr:
+            Identifier:
+              - modify_pricing
+              - start: 309
+                end: 323
+          span:
+            start: 301
+            end: 323
+        - kind: Cannot
+          expr:
+            Identifier:
+              - access_raw_payment_data
+              - start: 338
+                end: 361
+          span:
+            start: 330
+            end: 361
+        - kind: Must
+          expr:
+            Identifier:
+              - identify_as_ai
+              - start: 374
+                end: 388
+          span:
+            start: 368
+            end: 388
+      tools:
+        - name: orderLookup
+          inputs:
+            - name: input
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 424
+                  end: 431
+              default: ~
+              doc_comment: ~
+              span:
+                start: 417
+                end: 431
+          outputs:
+            - name: output
+              ty:
+                name: orderSummary
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 441
+                  end: 453
+              default: ~
+              doc_comment: ~
+              span:
+                start: 433
+                end: 453
+          span:
+            start: 405
+            end: 454
+      model:
+        - key: preference
+          value:
+            Identifier:
+              - Balanced
+              - start: 481
+                end: 489
+          span:
+            start: 469
+            end: 489
+      budget: ~
+      tests: []
+      span:
+        start: 142
+        end: 490

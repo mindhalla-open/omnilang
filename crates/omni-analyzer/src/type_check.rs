@@ -19,6 +19,25 @@ use crate::{Diagnostic, DiagnosticKind};
 
 /// Check that all type references in the source file resolve to defined types.
 pub fn check_types(file: &SourceFile, symbols: &SymbolTable, diagnostics: &mut Vec<Diagnostic>) {
+    // Validate per-service target overrides against the supported target set.
+    const SUPPORTED_TARGETS: [&str; 4] = ["typescript", "rust", "python", "go"];
+    for decl in &file.declarations {
+        if let Declaration::Service(s) = decl
+            && let Some(t) = &s.target
+            && !SUPPORTED_TARGETS.contains(&t.to_lowercase().as_str())
+        {
+            diagnostics.push(Diagnostic {
+                kind: DiagnosticKind::Error,
+                code: "E0242",
+                message: format!(
+                    "service '{}' declares unsupported target '{}' (expected one of: typescript, rust, python, go)",
+                    s.name, t
+                ),
+                span: s.span,
+            });
+        }
+    }
+
     for decl in &file.declarations {
         match decl {
             Declaration::Type(t) => {
@@ -141,6 +160,7 @@ fn check_type_ref(
         if !type_ref.type_args.is_empty() {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0201",
                 message: format!(
                     "generic parameter '{}' cannot have type arguments",
                     type_ref.name
@@ -156,6 +176,7 @@ fn check_type_ref(
         if symbol.type_params.len() != type_ref.type_args.len() {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0202",
                 message: format!(
                     "type '{}' expects {} type arguments, found {}",
                     type_ref.name,
@@ -176,6 +197,7 @@ fn check_type_ref(
                     if !symbols.contains(bound) {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Error,
+                            code: "E0203",
                             message: format!("undefined type bound: '{}'", bound),
                             span: type_ref.span,
                         });
@@ -186,6 +208,7 @@ fn check_type_ref(
     } else {
         diagnostics.push(Diagnostic {
             kind: DiagnosticKind::Error,
+            code: "E0204",
             message: format!("undefined type: '{}'", type_ref.name),
             span: type_ref.span,
         });
@@ -215,6 +238,7 @@ fn check_refined_type(
                 if !valid {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0205",
                         message: "format constraint expects regex(\"pattern\") or a string literal"
                             .to_string(),
                         span: constraint.span,
@@ -239,6 +263,7 @@ fn check_refined_type(
                 if !valid {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0206",
                         message: "range constraint expects a list of two numbers, e.g. [min, max]"
                             .to_string(),
                         span: constraint.span,
@@ -270,6 +295,7 @@ fn check_refined_type(
                 if !valid {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0207",
                         message: format!(
                             "{} constraint expects an integer literal",
                             constraint.name
@@ -286,6 +312,7 @@ fn check_refined_type(
                 if !valid {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0208",
                         message: "precision constraint expects an integer literal".to_string(),
                         span: constraint.span,
                     });
@@ -296,6 +323,7 @@ fn check_refined_type(
             _ => {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0209",
                     message: format!("unknown type constraint: '{}'", constraint.name),
                     span: constraint.span,
                 });
@@ -309,6 +337,7 @@ fn check_refined_type(
         (None, None) => {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0210",
                 message:
                     "cannot infer base type; please specify it explicitly (e.g. String { ... })"
                         .to_string(),
@@ -340,6 +369,7 @@ fn check_refined_type(
                 if !compatible {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0211",
                         message: format!("example value is not compatible with base type {}", base),
                         span: constraint.span,
                     });
@@ -455,11 +485,16 @@ fn check_constraint_existence(
         "audit_logging",
         "eventual_consistency",
         "anonymous",
+        // Formal-verification gate: services carrying these names opt their
+        // operation contracts into Z3 proof obligations (see formal.rs).
+        "formal_verification",
+        "proven",
     ];
 
     if !builtins.contains(&c.name.as_str()) && !symbols.contains(&c.name) {
         diagnostics.push(Diagnostic {
             kind: DiagnosticKind::Error,
+            code: "E0212",
             message: format!("undefined constraint: '{}'", c.name),
             span: c.span,
         });
@@ -472,6 +507,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if !c.args.is_empty() {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0213",
                     message: format!("constraint '{}' does not expect any arguments", c.name),
                     span: c.span,
                 });
@@ -481,6 +517,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if c.args.len() != 1 {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0214",
                     message: "constraint 'cacheable' expects exactly 1 argument (ttl: Duration)"
                         .to_string(),
                     span: c.span,
@@ -492,6 +529,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                 if name != "ttl" {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0215",
                         message: format!(
                             "unknown argument '{}' for constraint 'cacheable', expected 'ttl'",
                             name
@@ -503,6 +541,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if !matches!(&arg.value, Expression::Literal(Literal::Duration(_))) {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0216",
                     message: "argument 'ttl' for 'cacheable' must be a Duration (e.g. 5min, 200ms)"
                         .to_string(),
                     span: arg.span,
@@ -513,6 +552,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if c.args.len() != 2 {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0217",
                     message: "constraint 'rate_limited' expects exactly 2 arguments (max: Int, window: Duration)".to_string(),
                     span: c.span,
                 });
@@ -528,6 +568,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                         if !matches!(&arg.value, Expression::Literal(Literal::Int(_))) {
                             diagnostics.push(Diagnostic {
                                 kind: DiagnosticKind::Error,
+                                code: "E0218",
                                 message: "argument 'max' for 'rate_limited' must be an integer"
                                     .to_string(),
                                 span: arg.span,
@@ -538,6 +579,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                         if !matches!(&arg.value, Expression::Literal(Literal::Duration(_))) {
                             diagnostics.push(Diagnostic {
                                 kind: DiagnosticKind::Error,
+                                code: "E0219",
                                 message: "argument 'window' for 'rate_limited' must be a Duration"
                                     .to_string(),
                                 span: arg.span,
@@ -547,6 +589,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                     _ => {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Error,
+                            code: "E0220",
                             message: format!("unknown argument '{}' for constraint 'rate_limited', expected 'max' or 'window'", name),
                             span: arg.span,
                         });
@@ -558,6 +601,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if c.args.len() != 1 {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0221",
                     message: "constraint 'authorized' expects exactly 1 argument (roles: [Role])"
                         .to_string(),
                     span: c.span,
@@ -569,6 +613,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                 if name != "roles" {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0222",
                         message: format!(
                             "unknown argument '{}' for 'authorized', expected 'roles'",
                             name
@@ -580,6 +625,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if !matches!(&arg.value, Expression::List(_, _)) {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0223",
                     message: "argument 'roles' for 'authorized' must be a list of roles, e.g. [Admin, User]".to_string(),
                     span: arg.span,
                 });
@@ -589,6 +635,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if c.args.is_empty() {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0224",
                     message: "constraint 'latency' expects at least 1 percentile argument (e.g. p95: 50ms)".to_string(),
                     span: c.span,
                 });
@@ -600,6 +647,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                         if !matches!(&arg.value, Expression::Literal(Literal::Duration(_))) {
                             diagnostics.push(Diagnostic {
                                 kind: DiagnosticKind::Error,
+                                code: "E0225",
                                 message: format!(
                                     "percentile '{}' value must be a Duration",
                                     arg.name.as_ref().unwrap()
@@ -611,6 +659,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                     Some(other) => {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Error,
+                            code: "E0226",
                             message: format!(
                                 "unknown percentile '{}', expected p50, p95, or p99",
                                 other
@@ -621,6 +670,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                     None => {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Error,
+                            code: "E0227",
                             message: "arguments to 'latency' must be named, e.g. p95: 50ms"
                                 .to_string(),
                             span: arg.span,
@@ -633,6 +683,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if c.args.len() != 1 {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0228",
                     message: "constraint 'eventual_consistency' expects exactly 1 argument (max_lag: Duration)".to_string(),
                     span: c.span,
                 });
@@ -643,6 +694,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
                 if name != "max_lag" {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0229",
                         message: format!(
                             "unknown argument '{}' for 'eventual_consistency', expected 'max_lag'",
                             name
@@ -654,6 +706,7 @@ fn validate_constraint_args(c: &Constraint, diagnostics: &mut Vec<Diagnostic>) {
             if !matches!(&arg.value, Expression::Literal(Literal::Duration(_))) {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0230",
                     message: "argument 'max_lag' for 'eventual_consistency' must be a Duration"
                         .to_string(),
                     span: arg.span,
@@ -685,6 +738,7 @@ fn check_service_conflicts(
                             if prev_val != *d_val {
                                 diagnostics.push(Diagnostic {
                                     kind: DiagnosticKind::Error,
+                                    code: "E0231",
                                     message: format!(
                                         "conflicting latency requirements for '{}' in service '{}': {} vs {}",
                                         p_name, service_name, prev_val, d_val
@@ -701,6 +755,7 @@ fn check_service_conflicts(
             if has_anonymous {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0232",
                     message: format!(
                         "conflicting constraints on service '{}': 'authenticated' and 'anonymous'",
                         service_name
@@ -713,6 +768,7 @@ fn check_service_conflicts(
             if has_authenticated {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0233",
                     message: format!(
                         "conflicting constraints on service '{}': 'authenticated' and 'anonymous'",
                         service_name
@@ -744,6 +800,7 @@ fn check_transitive_propagation(
                 if !constraints.contains(&constraint.to_string()) {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0234",
                         message: format!(
                             "constraint '{}' propagates from service '{}' to depended-on service '{}', but '{}' is missing it",
                             constraint, start_service, dep, dep
@@ -799,9 +856,21 @@ pub fn compute_confidence_map(file: &SourceFile) -> HashMap<String, (TrustLevel,
             });
             let test_count: usize = s.operations.iter().map(|r| r.tests.len()).sum();
 
-            let local_level = if has_formal {
-                evidence.push("Formal verification constraints defined".to_string());
+            // Real proof status from Z3 (not just a constraint name): only an
+            // actually-discharged proof obligation earns `Proven`.
+            let (_has_formal_obligations, proven_count) = crate::formal::service_proof_status(s);
+
+            let local_level = if proven_count > 0 {
+                evidence.push(format!(
+                    "Z3-verified: {} proof obligation(s) discharged",
+                    proven_count
+                ));
                 TrustLevel::Proven
+            } else if has_formal {
+                // Formal-verification constraints are *declared* but not machine-
+                // proven (e.g. natural-language contracts) → High, not Proven.
+                evidence.push("Formal verification declared (not machine-proven)".to_string());
+                TrustLevel::High
             } else if test_count > 0 && has_perf {
                 evidence
                     .push("Unit/integration tests and performance benchmarks defined".to_string());
@@ -900,6 +969,7 @@ fn check_policies(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                                 if current_level < req_level {
                                     diagnostics.push(Diagnostic {
                                         kind: DiagnosticKind::Error,
+                                        code: "E0235",
                                         message: format!(
                                             "Service '{}' has confidence level {:?}, which violates trust policy '{}' requiring {:?}",
                                             target, current_level, p.name, req_level
@@ -1369,6 +1439,7 @@ fn check_contract_expr(
                     if c.is_uppercase() && !symbols.contains(name) {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Error,
+                            code: "E0236",
                             message: format!("undefined symbol: '{}'", name),
                             span: *span,
                         });
@@ -1386,6 +1457,7 @@ fn check_contract_expr(
                 if context != ContractExprContext::Postcondition {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0237",
                         message: "old() is only allowed in postconditions".to_string(),
                         span: *span,
                     });
@@ -1393,6 +1465,7 @@ fn check_contract_expr(
                 if args.len() != 1 {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E0238",
                         message: "old() expects exactly 1 argument".to_string(),
                         span: *span,
                     });
@@ -1455,6 +1528,7 @@ fn check_narrowing_in_expr(expr: &Expression, fields: &[Field], diagnostics: &mu
                     if !is_null_check(expr) {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Info,
+                            code: "E0239",
                             message: format!(
                                 "field '{}' has optional type; consider adding a null-check \
                                  guard for type narrowing (e.g. '{} != null')",
@@ -1468,6 +1542,7 @@ fn check_narrowing_in_expr(expr: &Expression, fields: &[Field], diagnostics: &mu
                     if !is_null_check(expr) {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Info,
+                            code: "E0240",
                             message: format!(
                                 "field '{}' has optional type; consider adding a null-check \
                                  guard for type narrowing (e.g. '{} != null')",
@@ -1576,6 +1651,7 @@ fn check_option_refs_in_expr(
                 if optional_names.contains(name) {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Info,
+                        code: "E0241",
                         message: format!(
                             "output '{}' has optional type; accessing field on it \
                              may fail if null — consider adding a null-check guard",

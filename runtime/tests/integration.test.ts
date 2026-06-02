@@ -61,6 +61,10 @@ describe("OmniLang End-to-End Integration", () => {
     );
 
     // Assert that the command compiled and finished successfully
+    if (buildResult.status !== 0) {
+      console.error("STDOUT:", buildResult.stdout?.toString());
+      console.error("STDERR:", buildResult.stderr?.toString());
+    }
     expect(buildResult.status).toBe(0);
 
     // Verify expected TypeScript code files were generated
@@ -128,6 +132,35 @@ describe("OmniLang End-to-End Integration", () => {
     const serviceCode = fs.readFileSync(serviceFile, "utf8");
     expect(serviceCode).toContain("pub struct CheckoutService");
     expect(serviceCode).toContain("pub fn place_order");
+  });
+
+  test("should produce a valid Rust crate on a warm cache (mod.rs regression)", () => {
+    // First build warms the .omni-cache for the rust target.
+    const warmup = spawnSync(
+      "cargo",
+      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "rust"],
+      { cwd: rootDir, env: { ...process.env, OMNI_MOCK_LLM: "true" } }
+    );
+    expect(warmup.status).toBe(0);
+
+    // A fresh build dir + warm cache is the regression case: cached files are
+    // restored verbatim, so module registration must be replayed or mod.rs
+    // stays empty and the generated crate fails to compile.
+    cleanBuildDir(buildDir);
+
+    const cachedBuild = spawnSync(
+      "cargo",
+      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "rust"],
+      { cwd: rootDir, env: { ...process.env, OMNI_MOCK_LLM: "true" } }
+    );
+    if (cachedBuild.status !== 0) {
+      console.error("STDOUT:", cachedBuild.stdout?.toString());
+      console.error("STDERR:", cachedBuild.stderr?.toString());
+    }
+    expect(cachedBuild.status).toBe(0);
+
+    const modRs = fs.readFileSync(path.join(buildDir, "src", "services", "mod.rs"), "utf8");
+    expect(modRs).toContain("pub mod checkout;");
   });
 
   test("should compile and generate Python code from checkout.omni using mock LLM", () => {

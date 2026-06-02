@@ -11,111 +11,12 @@ type apiResponse<T: serializable, E> = struct
   data T
   error E?
 
-type paymentStatus = enum { Success, Failed, Cancelled }
+type paymentStatus = enum
+  Success
+  Failed
+  Cancelled
 
 type value = int | float | string?
-
-type orderIdRefined = string {
-  format: regex("^[0-9]+$")
-  min_length: 5
-}
-
-type price = {
-  range: [0.0, 9999.9]
-}
-
-component productCard {
-  goal: "Render product details with real-time stock"
-  props:
-    id: productId
-    label: string
-  state:
-    stock: int
-  events:
-    - select(id: productId)
-  slots:
-    content: string
-  constraints:
-    - latency(p95: 50ms)
-  style_guide: "AcmeDark"
-  visual_spec:
-    - --viewport 375x812
-    - --theme dark
-  tests:
-    - scenario: "Render with stock"
-      given: stock == 5
-      expect: id != null
-}
-
-pipeline dailyRevenueReport {
-  goal: "Aggregate daily revenue"
-  source:
-    kind: PostgreSQL
-    table: orders
-  stages:
-    - filter: status == Completed
-  sink:
-    kind: S3
-    path: "s3://reports"
-  schedule: "0 6 * * *"
-}
-
-workflow orderFulfillment {
-  goal: "Manage order lifecycle"
-  states:
-    placed
-    paymentPending
-    shipped
-  transitions:
-    placed -> paymentPending:
-      trigger: order_placed
-      action: initiate_payment
-    paymentPending -> shipped:
-      trigger: payment_success
-      action: ship_order
-}
-
-agent customerSupportAgent {
-  goal: "Handle support inquiries"
-  capabilities:
-    - answer_faq
-  boundaries:
-    - cannot: modify_pricing
-  tools:
-    - orderLookup(input: orderId, output: orderSummary)
-  model:
-    preference: Balanced
-}
-
-schema ecommerceDb {
-  goal: "E-commerce data model"
-  target: postgresql
-  entity product {
-    id: productId @primary
-    name: string @indexed
-  }
-  relations:
-    - customer has_many orders
-  indexes:
-    - order(customer, placed_at)
-}
-
-policy securityBaseline {
-  description: "Minimum security requirements"
-  scope: global
-  rules:
-    - all services must:
-        - use TLS 1.3
-        - apply: PCI_DSS_v4
-}
-
-constraint pciCompliant {
-  requires:
-    - authenticated
-    - audit_logging
-  verification:
-    - tool: SonarQube evidence: "sonar-report.json"
-}
 
 service checkout
   goal "Perform user checkout"
@@ -131,3 +32,31 @@ service payments
   invariants:
     - balance >= 0
     - transaction_count >= 0
+
+orchestrator orderFulfillment
+  goal "Manage order lifecycle"
+
+  states: [Placed, PaymentPending, Shipped, Cancelled]
+
+  transitions:
+    - Placed -> PaymentPending -> Shipped
+    - PaymentPending -> Cancelled [on: PaymentFailed]
+
+  invariants:
+    - shipment_safety: "An order can only be Shipped after PaymentPending succeeds"
+
+schema ecommerceDb
+  goal "E-commerce data model"
+  target postgresql
+
+  entity product
+    id productId @primary
+    name string @indexed
+
+  relations:
+    - customer has_many orders
+
+constraint pciCompliant
+  requires:
+    - authenticated
+    - audit_logging

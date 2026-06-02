@@ -1,0 +1,13 @@
+{
+  "lockfile_version": 1,
+  "target": "go",
+  "generation": "provider=anthropic;model=default;temp=0",
+  "services": [
+    {
+      "name": "checkout",
+      "key": "96b56a44555fa05c",
+      "files": 2
+    }
+  ],
+  "generated_at": "2026-05-31T16:23:31.422Z"
+}

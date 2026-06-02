@@ -11,11 +11,10 @@ An **intent block** declares *what* the system should do without specifying *how
 ### Syntax
 
 ```omnilang
-service <Name> {
-  goal: "<natural language description of purpose>"
+service <Name>
+  goal "<natural language description of purpose>"
 
   // ... constraints, contracts, tests, evidence, budget
-}
 ```
 
 ### Design Philosophy
@@ -44,8 +43,8 @@ The natural language in `goal` fills the gap between these structural elements �
 ### Example: Service Intent
 
 ```omnilang
-service UserAuthentication {
-  goal: "Authenticate users via email/password or OAuth2 providers"
+service UserAuthentication
+  goal "Authenticate users via email/password or OAuth2 providers"
 
   constraints:
     - bcrypt_password_hashing(rounds: 12)
@@ -54,11 +53,11 @@ service UserAuthentication {
     - OWASP_compliance
 
   inputs:
-    credentials: EmailPassword | OAuthToken
+    credentials EmailPassword | OAuthToken
 
   outputs:
-    session: AuthSession
-    user: UserProfile
+    session AuthSession
+    user UserProfile
 
   tests:
     - scenario: "Valid email/password login"
@@ -70,14 +69,13 @@ service UserAuthentication {
       given: registered_user(email: "victim@example.com")
       when: login_attempts(email: "victim@example.com", count: 6, window: 10min)
       expect: status == RateLimited
-}
 ```
 
 ### Example: Component Intent
 
 ```omnilang
-component ShoppingCart {
-  goal: "Display cart items with real-time total, quantity editing, and checkout CTA"
+component ShoppingCart
+  goal "Display cart items with real-time total, quantity editing, and checkout CTA"
 
   constraints:
     - accessible(WCAG: "AA")
@@ -85,13 +83,13 @@ component ShoppingCart {
     - max_render_time: 16ms
 
   props:
-    items: List<CartItem>
-    currency: CurrencyCode
-    on_checkout: Callback
+    items List<CartItem>
+    currency CurrencyCode
+    on_checkout Callback
 
   state:
-    quantities: Map<ItemId, Quantity>
-    promo_code: Option<String>
+    quantities Map<ItemId, Quantity>
+    promo_code Option<String>
 
   visual_spec:
     - @assets/cart_desktop_golden.png  --viewport 1440x900
@@ -106,7 +104,6 @@ component ShoppingCart {
       given: items == [mock_item(qty: 2)]
       when: set_quantity(item_id: mock_item.id, qty: 3)
       expect: total == mock_item.price * 3
-}
 ```
 
 ---
@@ -166,11 +163,10 @@ OmniLang ships with a standard library of well-known constraints:
 ### Custom Constraints
 
 ```omnilang
-define constraint no_external_calls {
-  description: "Implementation must not make any outbound HTTP calls"
-  verify: static_analysis(rule: "no_http_client_imports")
-  severity: critical
-}
+define constraint no_external_calls
+  description "Implementation must not make any outbound HTTP calls"
+  verify static_analysis(rule: "no_http_client_imports")
+  severity critical
 ```
 
 ---
@@ -182,17 +178,17 @@ define constraint no_external_calls {
 ### Syntax
 
 ```omnilang
-contract TransferMoney {
+contract TransferMoney
   inputs:
-    from_account: AccountId
-    to_account: AccountId
-    amount: Money(positive: true)
-    currency: CurrencyCode
+    from_account AccountId
+    to_account AccountId
+    amount Money(positive: true)
+    currency CurrencyCode
 
   outputs:
-    transaction_id: TransactionId
-    new_balance_from: Money
-    new_balance_to: Money
+    transaction_id TransactionId
+    new_balance_from Money
+    new_balance_to Money
 
   preconditions:
     - from_account != to_account
@@ -210,10 +206,9 @@ contract TransferMoney {
     - transaction_log.is_append_only
 
   errors:
-    - InsufficientFunds(available: Money, requested: Money)
-    - AccountFrozen(account: AccountId, reason: String)
-    - DailyLimitExceeded(limit: Money, attempted: Money)
-}
+    - InsufficientFunds(available Money, requested Money)
+    - AccountFrozen(account AccountId, reason String)
+    - DailyLimitExceeded(limit Money, attempted Money)
 ```
 
 ### Pre/Postconditions
@@ -230,7 +225,7 @@ The `old()` function references a value's state before the operation, enabling d
 
 ## 4. Tests as First-Class Citizens
 
-In OmniLang, tests are not an afterthought — they are part of the specification. Every intent block should contain tests. Tests serve as both documentation and verification.
+In OmniLang, tests are not an afterthought — they are part of the specification. Every intent block should contain tests. Tests serve as BDD-style or property-based checks that prove correctness.
 
 ### Test Types
 
@@ -277,18 +272,20 @@ tests:
 ### Test Data Factories
 
 ```omnilang
-factory CartItem {
+factory CartItem
   defaults:
-    id: uuid()
-    name: fake.product_name()
-    price: Money(random(1.00, 999.99), USD)
-    quantity: random_int(1, 10)
+    id uuid()
+    name fake.product_name()
+    price Money(random(1.00, 999.99), USD)
+    quantity random_int(1, 10)
 
   variants:
-    expensive: { price: Money(5000.00, USD) }
-    free: { price: Money(0.00, USD) }
-    digital: { requires_shipping: false }
-}
+    expensive:
+      price Money(5000.00, USD)
+    free:
+      price Money(0.00, USD)
+    digital:
+      requires_shipping false
 ```
 
 ---
@@ -313,32 +310,31 @@ factory CartItem {
 ### Attaching Evidence to Specs
 
 ```omnilang
-service PaymentProcessor {
-  goal: "Process credit card payments"
+service PaymentProcessor
+  goal "Process credit card payments"
 
   evidence:
     // Reference evidence: human-provided artifacts that inform generation
     - reference: @docs/payment_flow_diagram.png
-      type: architecture_diagram
-      description: "Approved payment flow from tech design review"
+        type architecture_diagram
+        description "Approved payment flow from tech design review"
 
     // Expected evidence: artifacts the agent MUST produce during generation
     - required: test_results
-      format: junit_xml
-      expect: all_pass
+        format junit_xml
+        expect all_pass
 
     - required: security_scan
-      format: sarif
-      expect: no_critical, no_high
+        format sarif
+        expect no_critical, no_high
 
     - required: benchmark
-      format: json
-      expect: matches(constraints.latency)
+        format json
+        expect matches(constraints.latency)
 
     - required: coverage
-      format: lcov
-      expect: line_coverage >= 90%
-}
+        format lcov
+        expect line_coverage >= 90%
 ```
 
 ### Evidence Chain
@@ -364,40 +360,37 @@ Constraint: "latency(p95: <200ms)"
 ### Confidence Levels
 
 ```omnilang
-types:
-  Confidence: enum {
-    Proven       // Formally verified or exhaustively tested
-    High         // All tests pass, all constraints met, benchmarked
-    Medium       // Tests pass but edge cases may be underexplored
-    Low          // Basic functionality works, needs human review
-    Speculative  // Best-effort generation, not verified
-  }
+type Confidence = enum
+  Proven       // Formally verified or exhaustively tested
+  High         // All tests pass, all constraints met, benchmarked
+  Medium       // Tests pass but edge cases may be underexplored
+  Low          // Basic functionality works, needs human review
+  Speculative  // Best-effort generation, not verified
 ```
 
 ### Trust Policies
 
 ```omnilang
-policy ProductionReadiness {
-  description: "Rules for what can be deployed to production"
+policy ProductionReadiness
+  description "Rules for what can be deployed to production"
 
   rules:
     - if confidence < High:
-        action: block_deployment
-        notify: tech_lead
+        action block_deployment
+        notify tech_lead
 
     - if confidence == Medium:
-        action: allow_staging_only
-        require: human_review(within: 24h)
+        action allow_staging_only
+        require human_review(within: 24h)
 
     - if confidence == Low:
-        action: sandbox_only
-        require: pair_review(with: senior_engineer)
-        flag: "AI-generated, not production-ready"
+        action sandbox_only
+        require pair_review(with: senior_engineer)
+        flag "AI-generated, not production-ready"
 
     - if confidence == Speculative:
-        action: reject
-        message: "Insufficient confidence for any environment"
-}
+        action reject
+        message "Insufficient confidence for any environment"
 ```
 
 ### Confidence Propagation

@@ -1,0 +1,55 @@
+# GitLab CI pipeline for OmniLang — mirrors .github/workflows/ci.yml.
+# Lints, tests the Rust workspace + TypeScript runtime, and runs the mock-LLM
+# multi-target conformance matrix.
+
+stages:
+  - lint
+  - test
+  - e2e
+
+variables:
+  CARGO_TERM_COLOR: "always"
+
+default:
+  image: "rust:1.85"
+  cache:
+    key: "$CI_COMMIT_REF_SLUG"
+    paths:
+      - .cargo/
+      - target/
+
+fmt-clippy:
+  stage: lint
+  script:
+    - rustup component add rustfmt clippy
+    - cargo fmt --all -- --check
+    - cargo clippy --workspace --all-targets -- -D warnings
+
+cargo-test:
+  stage: test
+  script:
+    - apt-get update && apt-get install -y z3
+    - cargo test --workspace
+    # Generated TS types and IR schema must not drift from the Rust IR.
+    - git diff --exit-code runtime/src/types.ts runtime/src/ir.schema.json
+
+runtime-test:
+  stage: test
+  image: "node:20"
+  script:
+    - npm ci --prefix runtime
+    - npm run build --prefix runtime
+    - npm test --prefix runtime
+
+conformance-matrix:
+  stage: e2e
+  script:
+    - apt-get update && apt-get install -y z3 nodejs npm golang python3 python3-pip
+    - pip install --quiet pytest
+    - npm ci --prefix runtime && npm run build --prefix runtime
+    - cargo build --bin omni
+    - |
+      for target in typescript rust python go; do
+        echo "hybrid_billing -> $target"
+        OMNI_MOCK_LLM=true cargo run --bin omni -- build examples/hybrid_billing.omni --target "$target"
+      done

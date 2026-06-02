@@ -1,0 +1,444 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - phase1
+  span:
+    start: 0
+    end: 18
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: productId
+      type_params: []
+      kind:
+        Alias:
+          name: uuid
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 37
+            end: 41
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 20
+        end: 41
+  - Type:
+      name: orderId
+      type_params: []
+      kind:
+        Alias:
+          name: uuid
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 57
+            end: 61
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 42
+        end: 61
+  - Type:
+      name: orderSummary
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 82
+            end: 88
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 62
+        end: 88
+  - Type:
+      name: serializable
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: id
+              ty:
+                name: uuid
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 122
+                  end: 126
+              default: ~
+              doc_comment: ~
+              span:
+                start: 119
+                end: 126
+          span:
+            start: 116
+            end: 128
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 90
+        end: 128
+  - Type:
+      name: apiResponse
+      type_params:
+        - name: T
+          bounds:
+            - name: serializable
+              type_args: []
+              union_members: []
+              intersection_members: []
+              span:
+                start: 148
+                end: 160
+          span:
+            start: 145
+            end: 160
+        - name: E
+          bounds: []
+          span:
+            start: 162
+            end: 163
+      kind:
+        Struct:
+          fields:
+            - name: data
+              ty:
+                name: T
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 181
+                  end: 182
+              default: ~
+              doc_comment: ~
+              span:
+                start: 176
+                end: 182
+            - name: error
+              ty:
+                name: Option
+                type_args:
+                  - name: E
+                    type_args: []
+                    union_members: []
+                    intersection_members: []
+                    span:
+                      start: 191
+                      end: 192
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 191
+                  end: 193
+              default: ~
+              doc_comment: ~
+              span:
+                start: 185
+                end: 193
+          span:
+            start: 173
+            end: 195
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 128
+        end: 195
+  - Type:
+      name: paymentStatus
+      type_params: []
+      kind:
+        Enum:
+          variants:
+            - name: Success
+              fields: []
+              span:
+                start: 223
+                end: 230
+            - name: Failed
+              fields: []
+              span:
+                start: 233
+                end: 239
+            - name: Cancelled
+              fields: []
+              span:
+                start: 242
+                end: 251
+          span:
+            start: 220
+            end: 253
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 195
+        end: 253
+  - Type:
+      name: value
+      type_params: []
+      kind:
+        Alias:
+          name: Union
+          type_args: []
+          union_members:
+            - name: int
+              type_args: []
+              union_members: []
+              intersection_members: []
+              span:
+                start: 266
+                end: 269
+            - name: float
+              type_args: []
+              union_members: []
+              intersection_members: []
+              span:
+                start: 272
+                end: 277
+            - name: Option
+              type_args:
+                - name: string
+                  type_args: []
+                  union_members: []
+                  intersection_members: []
+                  span:
+                    start: 280
+                    end: 286
+              union_members: []
+              intersection_members: []
+              span:
+                start: 280
+                end: 287
+          intersection_members: []
+          span:
+            start: 266
+            end: 287
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 253
+        end: 287
+  - Service:
+      name: checkout
+      goal: Perform user checkout
+      target: ~
+      constraints:
+        - name: pciCompliant
+          args: []
+          span:
+            start: 387
+            end: 399
+      depends_on:
+        - payments
+      dependencies: []
+      policies: []
+      operations: []
+      budget: ~
+      metrics: []
+      invariants: []
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 289
+        end: 401
+  - Service:
+      name: payments
+      goal: Process card payments
+      target: ~
+      constraints:
+        - name: pciCompliant
+          args: []
+          span:
+            start: 470
+            end: 482
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations: []
+      budget: ~
+      metrics: []
+      invariants:
+        - BinaryOp:
+            left:
+              Identifier:
+                - balance
+                - start: 503
+                  end: 510
+            op: GtEq
+            right:
+              Literal:
+                Int: 0
+            span:
+              start: 503
+              end: 515
+        - BinaryOp:
+            left:
+              Identifier:
+                - transaction_count
+                - start: 522
+                  end: 539
+            op: GtEq
+            right:
+              Literal:
+                Int: 0
+            span:
+              start: 522
+              end: 544
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 401
+        end: 546
+  - Workflow:
+      name: orderFulfillment
+      goal: Manage order lifecycle
+      states:
+        - Placed
+        - PaymentPending
+        - Shipped
+        - Cancelled
+      transitions:
+        - from: Placed
+          to: PaymentPending
+          trigger: ~
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 686
+            end: 721
+        - from: PaymentPending
+          to: Shipped
+          trigger: ~
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 686
+            end: 721
+        - from: PaymentPending
+          to: Cancelled
+          trigger: PaymentFailed
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 728
+            end: 775
+      constraints: []
+      tests: []
+      dependencies: []
+      policies: []
+      invariants:
+        - BinaryOp:
+            left:
+              Identifier:
+                - shipment_safety
+                - start: 797
+                  end: 812
+            op: Eq
+            right:
+              Literal:
+                String: An order can only be Shipped after PaymentPending succeeds
+            span:
+              start: 797
+              end: 874
+      span:
+        start: 546
+        end: 876
+  - Schema:
+      name: ecommerceDb
+      goal: E-commerce data model
+      target: postgresql
+      entities:
+        - name: product
+          fields:
+            - name: id
+              ty:
+                name: productId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 971
+                  end: 980
+              default: ~
+              decorators:
+                - name: primary
+                  args: []
+                  span:
+                    start: 982
+                    end: 989
+              doc_comment: ~
+              span:
+                start: 968
+                end: 989
+            - name: name
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 999
+                  end: 1005
+              default: ~
+              decorators:
+                - name: indexed
+                  args: []
+                  span:
+                    start: 1007
+                    end: 1014
+              doc_comment: ~
+              span:
+                start: 994
+                end: 1014
+          doc_comment: ~
+          span:
+            start: 956
+            end: 1018
+      relations:
+        - lhs: customer
+          rel_type: has_many
+          rhs: orders
+          args: []
+          span:
+            start: 1035
+            end: 1059
+      indexes: []
+      constraints: []
+      span:
+        start: 876
+        end: 1061
+  - Constraint:
+      name: pciCompliant
+      requires:
+        - name: authenticated
+          args: []
+          span:
+            start: 1103
+            end: 1116
+        - name: audit_logging
+          args: []
+          span:
+            start: 1123
+            end: 1136
+      verification: []
+      span:
+        start: 1061
+        end: 1137

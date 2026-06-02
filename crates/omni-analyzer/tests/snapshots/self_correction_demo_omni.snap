@@ -1,0 +1,22 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "warning[E0301]: service 'bankTransferService' has no constraints — consider adding latency, reliability, or security constraints"
+  - "warning[E0305]: Precondition 'Transfer amount must be strictly greater than zero' in operation 'bankTransferService.Transfer' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0305]: Precondition 'Sender account must have sufficient funds' in operation 'bankTransferService.Transfer' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0305]: Precondition 'Both accounts must exist and be in Active status' in operation 'bankTransferService.Transfer' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'Sender balance must decrease by the transfer amount' in operation 'bankTransferService.Transfer' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "warning[E0306]: Postcondition 'Receiver balance must increase by the transfer amount' in operation 'bankTransferService.Transfer' is a natural language constraint and cannot be statically verified. Consider formalizing it as a mathematical expression."
+  - "info[E0307]: operation 'bankTransferService.Transfer' has no test scenarios — consider adding tests for verification"
+  - "warning[E0804]: Critical invariant 'balance_safety' in service 'bankTransferService' is natural-language and cannot be formally proven. Express it as a mathematical formula to gain a Z3 guarantee."
+ir:
+  module_path: acme.banking.demo
+  types:
+    - accountId
+    - account
+  services:
+    - bankTransferService
+  build_order:
+    - bankTransferService

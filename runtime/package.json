@@ -1,10 +1,10 @@
 {
   "name": "omni-runtime",
-  "version": "0.1.0",
+  "version": "0.11.0",
   "description": "OmniLang Orchestrator & TypeScript Code Generator Runtime",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc",
+    "build": "tsc && cp src/ir.schema.json dist/ir.schema.json",
     "start": "node dist/index.js",
     "test": "jest",
     "demo:self-correction": "NODE_PATH=node_modules ts-node --project tsconfig.json -T ../scripts/demo-self-correction.ts",
@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
+    "ajv": "^8.20.0",
     "dotenv": "^16.4.5",
     "minimist": "^1.2.8",
     "picocolors": "^1.1.1"
@@ -20,6 +21,7 @@
     "@types/jest": "^29.5.14",
     "@types/minimist": "^1.2.5",
     "@types/node": "^20.17.6",
+    "fast-check": "^4.8.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.2.5",
     "typescript": "^5.6.3"

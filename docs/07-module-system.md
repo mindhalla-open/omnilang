@@ -49,12 +49,21 @@ By default, all top-level declarations in a module are **public**. Use `internal
 module acme.payments.checkout
 
 // Public (importable by other modules)
-type PaymentStatus = enum { ... }
-service Checkout { ... }
+type PaymentStatus = enum
+  Pending
+  Completed
+  Failed
+
+service Checkout
+  goal "Process checkout"
 
 // Internal (visible only within this module)
-internal type InternalState = enum { ... }
-internal constraint legacy_compat { ... }
+internal type InternalState = enum
+  Draft
+  Processing
+
+internal constraint legacy_compat
+  goal "legacy compatibility"
 ```
 
 ### Importing
@@ -174,7 +183,7 @@ acme-ecommerce@1.0.0
 Define reusable capability bundles:
 
 ```omnilang
-mixin Auditable {
+mixin Auditable
   constraints:
     - audit_logging(level: "detailed")
     - tamper_proof_log
@@ -183,35 +192,31 @@ mixin Auditable {
     - audit_log.last_entry.action == self.name
     - audit_log.last_entry.timestamp == now()
     - audit_log.last_entry.actor == context.current_user
-}
 
-mixin rateLimited(requests: int, window: duration) {
+mixin rateLimited(requests int, window duration)
   constraints:
     - rate_limit(max: requests, per: window)
-    - rate_limit_response: 429 with Retry-After header
+    - rate_limit_response 429 with Retry-After header
 
   tests:
     - scenario: "Rate limit enforced"
       when: send_requests(count: requests + 1, within: window)
       expect: last_response.status == 429
-}
 
-mixin cacheable(ttl: duration) {
+mixin cacheable(ttl duration)
   constraints:
     - cache(strategy: "read-through", ttl: ttl)
     - cache_invalidation: on_write
 
   postconditions:
     - cache_hit_rate > 80% under steady-state load
-}
 
 // Apply mixins to services
-service ProductSearch {
-  includes: [Auditable, RateLimited(100, 1min), Cacheable(5min)]
+service ProductSearch
+  includes [Auditable, RateLimited(100, 1min), Cacheable(5min)]
 
-  goal: "Search products by keyword, category, and filters"
+  goal "Search products by keyword, category, and filters"
   // ...
-}
 ```
 
 ### Extension Points
@@ -219,8 +224,8 @@ service ProductSearch {
 Define slots where other modules can plug in:
 
 ```omnilang
-service OrderPipeline {
-  goal: "Process orders through a configurable pipeline"
+service OrderPipeline
+  goal "Process orders through a configurable pipeline"
 
   stages:
     - validate_order   // built-in
@@ -229,21 +234,20 @@ service OrderPipeline {
     - @extension("post_payment") // extension point
     - fulfill_order    // built-in
 
-  extension_contract "pre_payment" {
-    inputs: order: ValidatedOrder
-    outputs: order: ValidatedOrder  // may modify order
+  extension_contract "pre_payment"
+    inputs:
+      order ValidatedOrder
+    outputs:
+      order ValidatedOrder  // may modify order
     constraints:
-      - must_not_modify: [order.id, order.customer]
-      - max_latency: 100ms
-  }
-}
+      - must_not_modify [order.id, order.customer]
+      - max_latency 100ms
 
 // In another module:
-extend OrderPipeline.pre_payment {
-  name: "FraudCheck"
-  impl: service FraudDetection
-  priority: 1  // runs first among extensions
-}
+extend OrderPipeline.pre_payment
+  name "FraudCheck"
+  impl service FraudDetection
+  priority 1  // runs first among extensions
 ```
 
 ### Generic Specifications
@@ -251,63 +255,69 @@ extend OrderPipeline.pre_payment {
 Parameterized specs for common patterns:
 
 ```omnilang
-generic CrudService<Entity, Id> {
-  goal: "Standard CRUD operations for ${Entity.name}"
+generic CrudService<Entity, Id>
+  goal "Standard CRUD operations for ${Entity.name}"
 
-  rpc Create {
-    inputs: data: Partial<Entity>
-    outputs: entity: Entity
+  operation Create
+    inputs:
+      data Partial<Entity>
+    outputs:
+      entity Entity
     postconditions:
       - entity.id is newly generated
       - entity matches data (for provided fields)
-  }
 
-  rpc Read {
-    inputs: id: Id
-    outputs: entity: Entity
-    errors: NotFound(id: Id)
-  }
-
-  rpc Update {
+  operation Read
     inputs:
-      id: Id
-      data: Partial<Entity>
-    outputs: entity: Entity
-    errors: NotFound(id: Id)
+      id Id
+    outputs:
+      entity Entity
+    errors:
+      NotFound(id Id)
+
+  operation Update
+    inputs:
+      id Id
+      data Partial<Entity>
+    outputs:
+      entity Entity
+    errors:
+      NotFound(id Id)
     postconditions:
       - entity.id == id
       - entity matches data (for provided fields)
       - entity.updated_at > old(entity.updated_at)
-  }
 
-  rpc Delete {
-    inputs: id: Id
-    outputs: success: bool
-    errors: NotFound(id: Id)
-  }
-
-  rpc List {
+  operation Delete
     inputs:
-      filters: partial<Entity>
-      pagination: paginationParams
-    outputs: paginatedList<Entity>
-  }
-}
+      id Id
+    outputs:
+      success bool
+    errors:
+      NotFound(id Id)
+
+  operation List
+    inputs:
+      filters partial<Entity>
+      pagination paginationParams
+    outputs:
+      result paginatedList<Entity>
 
 // Instantiate for a specific entity
-service productService = CrudService<product, productId> {
+service productService = CrudService<product, productId>
   // Add product-specific extensions
   constraints:
     - soft_delete
 
-  rpc Search {
-    inputs: query: string, filters: productFilters
-    outputs: paginatedList<product>
+  operation Search
+    inputs:
+      query string
+      filters productFilters
+    outputs:
+      result paginatedList<product>
     constraints:
       - full_text_search
       - latency(p95: <100ms)
-  }
-}
 ```
 
 ---

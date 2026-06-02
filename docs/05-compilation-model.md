@@ -477,19 +477,17 @@ OmniLang can target multiple implementation languages:
 target: typescript
 
 // Per-service target override
-service PaymentProcessor {
-  target: rust  // performance-critical → Rust
+service PaymentProcessor
+  target rust  // performance-critical → Rust
   // ...
-}
 
 // Auto-select based on constraints
-service MLInference {
-  target: auto
+service MLInference
+  target auto
   constraints:
     - gpu_acceleration
     - numpy_compatible
   // auto → Python (inferred from constraints)
-}
 ```
 
 ---

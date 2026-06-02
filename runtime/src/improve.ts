@@ -21,6 +21,48 @@ export interface RetryRecord {
   prompt: string;
 }
 
+/// Structured category of a verification failure, derived deterministically from
+/// the diagnostic text. Replaces ad-hoc substring sniffing scattered in prompts.
+export type FailureCategory =
+  | "contract"
+  | "type"
+  | "import"
+  | "test"
+  | "syntax"
+  | "timeout"
+  | "unknown";
+
+/// Classifies a verification error into a single, stable category. Order matters:
+/// more specific signals are checked before generic ones.
+export function classifyFailure(error: string): FailureCategory {
+  const e = error.toLowerCase();
+  if (e.includes("contract coverage") || e.includes("@omni:contract")) return "contract";
+  if (e.includes("timeout") || e.includes("timed out")) return "timeout";
+  if (
+    e.includes("has no exported member") ||
+    e.includes("cannot find name") ||
+    e.includes("cannot find module") ||
+    e.includes("is not defined")
+  ) {
+    return "import";
+  }
+  // tsc type errors look like `error TS####:`
+  if (/error ts\d+/.test(e) || e.includes("type ") || e.includes("not assignable")) return "type";
+  // Syntax is checked before tests because "unexpected" contains "expect".
+  if (e.includes("syntax") || e.includes("parse") || e.includes("unexpected")) return "syntax";
+  if (e.includes("test") || e.includes("expect") || e.includes("assert")) return "test";
+  return "unknown";
+}
+
+export interface TraceSummary {
+  totalTraces: number;
+  succeeded: number;
+  failed: number;
+  retriedServices: number;
+  avgAttempts: number;
+  byCategory: Record<string, number>;
+}
+
 export class AgentOptimizer {
   private cacheDir: string;
   private tracesDir: string;
@@ -45,6 +87,58 @@ export class AgentOptimizer {
   public logTrace(trace: TraceLog): void {
     const tracePath = path.join(this.tracesDir, `${trace.serviceName}_${Date.now()}.json`);
     fs.writeFileSync(tracePath, JSON.stringify(trace, null, 2), "utf8");
+  }
+
+  /// Aggregates recorded traces + retries into a summary: success/failure
+  /// counts, average attempts, and a breakdown of failures by category. Powers
+  /// `omni agents benchmark` and surfaces self-correction convergence.
+  public summarizeTraces(): TraceSummary {
+    const summary: TraceSummary = {
+      totalTraces: 0,
+      succeeded: 0,
+      failed: 0,
+      retriedServices: 0,
+      avgAttempts: 0,
+      byCategory: {},
+    };
+    if (!fs.existsSync(this.tracesDir)) return summary;
+
+    const traceFiles = fs
+      .readdirSync(this.tracesDir)
+      .filter((f) => f.endsWith(".json") && f !== "retries.json");
+
+    let attemptsSum = 0;
+    const bump = (err: string) => {
+      const cat = classifyFailure(err);
+      summary.byCategory[cat] = (summary.byCategory[cat] ?? 0) + 1;
+    };
+
+    for (const f of traceFiles) {
+      try {
+        const t: TraceLog = JSON.parse(fs.readFileSync(path.join(this.tracesDir, f), "utf8"));
+        summary.totalTraces++;
+        if (t.success) summary.succeeded++;
+        else summary.failed++;
+        if (t.attempts > 1) summary.retriedServices++;
+        attemptsSum += t.attempts || 0;
+        for (const err of t.errors ?? []) bump(err);
+      } catch {
+        // skip malformed trace
+      }
+    }
+
+    if (fs.existsSync(this.retriesFile)) {
+      try {
+        const retries: RetryRecord[] = JSON.parse(fs.readFileSync(this.retriesFile, "utf8"));
+        for (const r of retries) bump(r.error);
+      } catch {
+        // ignore
+      }
+    }
+
+    summary.avgAttempts =
+      summary.totalTraces > 0 ? attemptsSum / summary.totalTraces : 0;
+    return summary;
   }
 
   public logRetry(retry: RetryRecord): void {

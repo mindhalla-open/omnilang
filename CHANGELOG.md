@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **Z3 formal verification hardening**:
+  - SMT sorts are now taken from the operation's declared `inputs`/`outputs` types (name-based heuristics are only a fallback; fixed `valid`-style names being typed `String` because they contain the substring `id`).
+  - Counterexamples are extracted from the Z3 model and reported as concrete `var = value` bindings (e.g. `amount = 1.0, balance = 0.0`).
+  - Z3 invocations run with a hard 10s timeout so a difficult obligation can no longer hang `omni check`/`omni build`.
+  - New diagnostics: `E0805` (Z3 not on PATH — verification skipped, honestly reported instead of the previous "Simulating formal verification (Verified successfully)") and `E0806` (formal verification declared but nothing machine-checkable was proven).
+  - `formal_verification` and `proven` are now registered constraint names (no more `E0212: undefined constraint` when opting into proofs).
+  - New example `examples/formal_transfer.omni` with two Z3-proven obligations and a deferred natural-language condition.
+
+### Fixed
+
+- **Formal verification soundness**: natural-language conditions were asserted verbatim into SMT scripts (invalid SMT → spurious failures), operations with no formal postconditions ran `check-sat` on preconditions alone and reported the inevitable `sat` as a "counterexample", and out-of-subset operators (`in`, `..`) were silently translated as `=` — which could produce a false proof. All conditions are now filtered to the machine-checkable subset, untranslatable constructs are hard errors, and skipped natural-language conditions are reported as deferred to generated tests.
+
+- **Rust builds no longer break on cache hits**: when a service was restored from the `.omni-cache` build cache, the generated crate's `src/services/mod.rs` was left empty (module registration only ran on fresh LLM generations), so `cargo test` on the output failed with `E0432: unresolved import`. The cache-restore path now replays the module registration. Added a warm-cache regression test.
+- Synced `runtime/package.json` (0.1.0) and `scripts/npm/package.json` (0.6.0) versions to the workspace version (0.11.0).
+
 ## [0.11.0] - 2026-05-29
 
 ### Added

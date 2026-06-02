@@ -87,7 +87,7 @@ export type TestBlock = { kind: TestKind; span: Span }
 
 export type OperationDecl = { name: string; inputs: Field[]; outputs: Field[]; preconditions: Expression[]; postconditions: Expression[]; errors: ErrorDecl[]; constraints: Constraint[]; tests: TestBlock[]; doc_comment: string | null; span: Span }
 
-export type ServiceDecl = { name: string; goal: string | null; constraints: Constraint[]; depends_on: string[]; dependencies: DependencyRef[]; policies: ServicePolicy[]; operations: OperationDecl[]; budget: BudgetBlock | null; metrics: MetricDecl[]; invariants: Expression[]; applies: string[]; visibility: Visibility; doc_comment: string | null; span: Span }
+export type ServiceDecl = { name: string; goal: string | null; target: string | null; constraints: Constraint[]; depends_on: string[]; dependencies: DependencyRef[]; policies: ServicePolicy[]; operations: OperationDecl[]; budget: BudgetBlock | null; metrics: MetricDecl[]; invariants: Expression[]; applies: string[]; visibility: Visibility; doc_comment: string | null; span: Span }
 
 /**
  * A reusable mixin block.
@@ -150,6 +150,10 @@ export type DependencyRef = { name: string; notes: string | null; span: Span }
 
 export type ServicePolicy = { name: string; entries: ConfigEntry[]; span: Span }
 
+export type RuleDecl = { name: string; target: string; condition: Expression; doc_comment: string | null; span: Span }
+
+export type ActionDecl = { name: string; inputs: Field[]; outputs: Field[]; preconditions: Expression[]; postconditions: Expression[]; doc_comment: string | null; span: Span }
+
 /**
  * A top-level declaration.
  */
@@ -168,7 +172,7 @@ export type TypeDef = { name: string; kind: string; field_count: number; generat
  */
 export type GeneratorConfig = { min?: number | null; max?: number | null; min_length?: number | null; max_length?: number | null; format_pattern?: string | null; precision?: number | null }
 
-export type ServiceDef = { name: string; goal: string | null; operation_count: number; operation_names: string[]; constraint_count: number; constraint_names: string[]; dependency_count: number; test_count: number; metric_count: number; metric_names: string[]; confidence: TrustLevel; evidence: string[] }
+export type ServiceDef = { name: string; goal: string | null; target: string | null; operation_count: number; operation_names: string[]; constraint_count: number; constraint_names: string[]; dependency_count: number; test_count: number; metric_count: number; metric_names: string[]; confidence: TrustLevel; evidence: string[] }
 
 export type SpecStats = { type_count: number; service_count: number; operation_count: number; test_count: number; constraint_count: number; metric_count: number; component_count: number; pipeline_count: number; workflow_count: number; agent_count: number; schema_count: number; policy_count: number }
 
@@ -181,4 +185,4 @@ export type TypeMapping = { omni_type: string; target_type: string; import_path?
  * Validated Specification IR — the output of the analysis phase.
  * This is consumed by the orchestrator/codegen pipeline.
  */
-export type SpecIR = { module_path: string[]; source_file: SourceFile; types: TypeDef[]; services: ServiceDef[]; build_order: string[]; type_mappings: TypeMapping[]; stats: SpecStats }
+export type SpecIR = { ir_version: string; module_path: string[]; source_file: SourceFile; types: TypeDef[]; services: ServiceDef[]; build_order: string[]; type_mappings: TypeMapping[]; stats: SpecStats }

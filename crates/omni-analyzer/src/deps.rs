@@ -54,6 +54,7 @@ pub fn build_dependency_graph(
                 if !service_names.contains(dep_name) {
                     diagnostics.push(Diagnostic {
                         kind: DiagnosticKind::Error,
+                        code: "E1001",
                         message: format!(
                             "service '{}' depends on undefined service '{}'",
                             s.name, dep_name
@@ -75,6 +76,7 @@ pub fn build_dependency_graph(
         Err(cycle) => {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E1002",
                 message: format!("circular dependency detected: {}", cycle.join(" → ")),
                 span: omni_parser::Span::new(0, 0),
             });
@@ -182,5 +184,29 @@ service A {
         );
         assert!(diags.iter().any(|d| d.kind == DiagnosticKind::Error
             && d.message.contains("undefined service")));
+    }
+
+    #[test]
+    fn detects_circular_dependency() {
+        let (graph, diags) = parse_and_graph(
+            r#"module test
+service A {
+  goal: "A"
+  depends_on:
+    - B
+}
+service B {
+  goal: "B"
+  depends_on:
+    - A
+}"#,
+        );
+        assert!(
+            diags
+                .iter()
+                .any(|d| d.kind == DiagnosticKind::Error && d.message.contains("circular")),
+            "expected a circular-dependency error"
+        );
+        assert!(graph.order.is_empty(), "no build order when a cycle exists");
     }
 }

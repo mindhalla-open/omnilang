@@ -38,6 +38,8 @@ async function main() {
     process.exit(1);
   }
   const fullStack = !!argv["full-stack"];
+  const frozen = !!argv["frozen"];
+  const budget = argv.budget !== undefined ? parseFloat(String(argv.budget)) : undefined;
   const mode = argv.mode || "build";
 
   console.log(pc.green(`🚀 Starting OmniLang Generator Runtime [Mode: ${mode}]`));
@@ -55,7 +57,7 @@ async function main() {
       const docGen = new DocGenerator({ irPath, outputDir });
       await docGen.generate();
     } else {
-      const orchestrator = new Orchestrator({ irPath, outputDir, target, fullStack });
+      const orchestrator = new Orchestrator({ irPath, outputDir, target, fullStack, frozen, budget });
       await orchestrator.run();
     }
     process.exit(0);

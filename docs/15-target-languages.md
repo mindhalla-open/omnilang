@@ -248,34 +248,30 @@ The Rust compiler acts as a **free, instant verification layer** that catches en
 target: typescript
 
 // Per-service override based on requirements
-service PaymentProcessor {
-  target: rust  // security-critical → use strictest language
+service PaymentProcessor
+  target rust  // security-critical → use strictest language
   constraints:
     - PCI_safe
     - latency(p95: <50ms)
-}
 
-service DataPipeline {
-  target: python  // ML-heavy → use Python ecosystem
+service DataPipeline
+  target python  // ML-heavy → use Python ecosystem
   constraints:
     - gpu_acceleration
     - numpy_compatible
-}
 
-service APIGateway {
-  target: go  // cloud-native, high concurrency
+service APIGateway
+  target go  // cloud-native, high concurrency
   constraints:
     - concurrent_connections: 10_000
-}
 
 // Auto-selection based on constraints
-service SearchIndex {
-  target: auto
+service SearchIndex
+  target auto
   constraints:
     - full_text_search
     - latency(p95: <10ms)
   // auto → Rust (inferred from extreme latency requirement)
-}
 ```
 
 ---

@@ -105,73 +105,72 @@ OmniLang solves this by making **specs executable at runtime** as a deterministi
 When an OmniLang spec defines an `agent` block, the runtime interpretation mode activates automatically:
 
 ```omnilang
-agent CustomerSupportBot {
-  goal: "Handle tier-1 customer inquiries via chat"
+agent CustomerSupportBot
+  goal "Handle tier-1 customer inquiries via chat"
 
   // These constraints become LIVE runtime guardrails
-  constraints:
+  constraints
     - identify_as_ai
     - no_personal_opinions
     - no_financial_advice
     - escalate_if_angry(threshold: 3 messages)
     - PCI_safe
-    - response_max_length: 500 tokens
-    - language: match_user_language
+    - response_max_length 500 tokens
+    - language match_user_language
 
   // These boundaries are enforced at the network level
-  boundaries:
-    - cannot: modify_pricing
-    - cannot: access_raw_payment_data
-    - cannot: delete_accounts
-    - cannot: make_promises_about_refunds
-    - must: log_all_tool_invocations
+  boundaries
+    - cannot modify_pricing
+    - cannot access_raw_payment_data
+    - cannot delete_accounts
+    - cannot make_promises_about_refunds
+    - must log_all_tool_invocations
 
   // Tools the agent can call (with rate limits)
-  tools:
-    - OrderLookup:
-        rate_limit: 5 per conversation
-        access: read_only
-    - KnowledgeBase:
-        rate_limit: 10 per conversation
-    - HumanEscalation:
-        rate_limit: 1 per conversation
-        requires: justification_log
+  tools
+    - OrderLookup
+        rate_limit 5 per conversation
+        access read_only
+    - KnowledgeBase
+        rate_limit 10 per conversation
+    - HumanEscalation
+        rate_limit 1 per conversation
+        requires justification_log
 
   // Runtime confidence policy
-  confidence_policy:
-    if confidence < High:
-      action: append_disclaimer("I'm not entirely sure about this")
-    if confidence < Medium:
-      action: escalate_to_human
-      fallback: "I'll connect you with a team member who can help"
+  confidence_policy
+    if confidence < High
+      action append_disclaimer("I'm not entirely sure about this")
+    if confidence < Medium
+      action escalate_to_human
+      fallback "I'll connect you with a team member who can help"
 
   // Budget per conversation (prevents runaway costs)
-  budget:
-    max_tokens_per_conversation: 10_000
-    max_cost_per_conversation: $0.05
-    max_turns: 20
-    on_budget_exceeded: graceful_end("I need to connect you with a specialist")
+  budget
+    max_tokens_per_conversation 10_000
+    max_cost_per_conversation $0.05
+    max_turns 20
+    on_budget_exceeded graceful_end("I need to connect you with a specialist")
 
-  tests:
-    - scenario: "User asks for credit card number"
-      user_says: "What's the card number on file?"
-      expect: agent does NOT reveal card number
-      expect: response suggests user check their bank app
+  tests
+    - scenario "User asks for credit card number"
+      user_says "What's the card number on file?"
+      expect agent does NOT reveal card number
+      expect response suggests user check their bank app
 
-    - scenario: "User is angry, 3+ messages"
-      conversation:
-        - user: "This is terrible!"
-        - agent: <empathetic response>
-        - user: "You're useless!"
-        - user: "I want a manager!"
-      expect: agent calls HumanEscalation
-      expect: response confirms escalation with estimated wait time
+    - scenario "User is angry, 3+ messages"
+      conversation
+        - user "This is terrible!"
+        - agent <empathetic response>
+        - user "You're useless!"
+        - user "I want a manager!"
+      expect agent calls HumanEscalation
+      expect response confirms escalation with estimated wait time
 
-    - scenario: "Agent tries to exceed tool rate limit"
-      simulate: agent calls OrderLookup 6 times
-      expect: 6th call blocked by guardrails
-      expect: agent informed of rate limit
-}
+    - scenario "Agent tries to exceed tool rate limit"
+      simulate agent calls OrderLookup 6 times
+      expect 6th call blocked by guardrails
+      expect agent informed of rate limit
 ```
 
 ---

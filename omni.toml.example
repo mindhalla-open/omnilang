@@ -5,10 +5,17 @@
 name = "my-project"
 version = "0.1.0"
 description = "My OmniLang project"
+syntax_version = "0.2"          # OmniLang grammar version (indentation-based, brace-free)
 
 [build]
 target = "typescript"          # default target language: typescript | rust | python | go
 output_dir = "build"           # where generated code goes
+
+[generation]                   # pinned params for reproducible builds (folded into the cache key)
+provider = "anthropic"         # anthropic | ollama | llamacpp
+model = "claude-sonnet-4-20250514"
+temperature = 0                # 0 maximizes determinism
+seed = 0                       # fixed seed where the provider supports it
 
 [agents]
 default_model = "balanced"

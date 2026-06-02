@@ -1,0 +1,168 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - booking
+  span:
+    start: 0
+    end: 19
+imports: []
+exports: []
+declarations:
+  - Workflow:
+      name: BookingFlow
+      goal: Process flight and hotel booking saga with safety invariants
+      states:
+        - Created
+        - FlightBooked
+        - HotelBooked
+        - Paid
+        - Cancelled
+        - Failed
+        - AnyStateExceptPaid
+      transitions:
+        - from: Created
+          to: FlightBooked
+          trigger: ~
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 231
+            end: 277
+        - from: FlightBooked
+          to: HotelBooked
+          trigger: ~
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 231
+            end: 277
+        - from: HotelBooked
+          to: Paid
+          trigger: ~
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 231
+            end: 277
+        - from: AnyStateExceptPaid
+          to: Cancelled
+          trigger: Timeout or UserAbort
+          timeout: ~
+          guard: ~
+          actions: []
+          span:
+            start: 284
+            end: 342
+      constraints: []
+      tests:
+        - kind:
+            Scenario:
+              name: Hotel reservation fails
+              given:
+                - BinaryOp:
+                    left:
+                      Identifier:
+                        - HotelBooked
+                        - start: 803
+                          end: 814
+                    op: Eq
+                    right:
+                      Literal:
+                        Bool: false
+                    span:
+                      start: 803
+                      end: 823
+              when: []
+              expect:
+                - BinaryOp:
+                    left:
+                      Identifier:
+                        - state
+                        - start: 838
+                          end: 843
+                    op: Eq
+                    right:
+                      Identifier:
+                        - Cancelled
+                        - start: 847
+                          end: 856
+                    span:
+                      start: 838
+                      end: 856
+              expect_error: ~
+          span:
+            start: 754
+            end: 857
+      dependencies:
+        - name: FlightService
+          notes: gRPC API
+          span:
+            start: 364
+            end: 390
+        - name: HotelService
+          notes: gRPC API
+          span:
+            start: 395
+            end: 420
+        - name: PaymentService
+          notes: HTTP API
+          span:
+            start: 425
+            end: 452
+      policies:
+        - name: enrich_user_loyalty
+          entries:
+            - key: action
+              value:
+                Literal:
+                  String: enrich
+              span:
+                start: 501
+                end: 517
+            - key: rule
+              value:
+                Literal:
+                  String: vip
+              span:
+                start: 526
+                end: 537
+          span:
+            start: 470
+            end: 541
+      invariants:
+        - BinaryOp:
+            left:
+              Identifier:
+                - money_safety
+                - start: 559
+                  end: 571
+            op: Eq
+            right:
+              Literal:
+                String: Charging money in Paid state occurs ONLY after successful FlightBooked and HotelBooked
+            span:
+              start: 559
+              end: 661
+        - BinaryOp:
+            left:
+              Identifier:
+                - saga_compensation
+                - start: 668
+                  end: 685
+            op: Eq
+            right:
+              Literal:
+                String: "If HotelBooked fails, call FlightService.Release"
+            span:
+              start: 668
+              end: 737
+      span:
+        start: 21
+        end: 857

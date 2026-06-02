@@ -1,0 +1,96 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - stabilization
+    - test
+  span:
+    start: 0
+    end: 30
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: userId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 46
+            end: 52
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 32
+        end: 52
+  - Schema:
+      name: userDb
+      goal: Store and manage user account details
+      target: postgresql
+      entities:
+        - name: user
+          fields:
+            - name: id
+              ty:
+                name: userId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 210
+                  end: 216
+              default: ~
+              decorators:
+                - name: primary
+                  args: []
+                  span:
+                    start: 218
+                    end: 225
+              doc_comment: Unique primary key
+              span:
+                start: 207
+                end: 225
+            - name: name
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 265
+                  end: 271
+              default: ~
+              decorators:
+                - name: indexed
+                  args: []
+                  span:
+                    start: 273
+                    end: 280
+              doc_comment: User name for profile
+              span:
+                start: 260
+                end: 280
+          doc_comment: User account entity
+          span:
+            start: 171
+            end: 284
+      relations:
+        - lhs: user
+          rel_type: has_many
+          rhs: accountSettings
+          args: []
+          span:
+            start: 301
+            end: 330
+      indexes: []
+      constraints: []
+      span:
+        start: 54
+        end: 331

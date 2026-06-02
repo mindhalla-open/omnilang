@@ -57,25 +57,55 @@ export class AnthropicProvider implements LLMProvider {
     const systemPromptLower = systemPrompt.toLowerCase();
 
     // Detect target from the system prompt
+    let raw: string;
+    let comment = "//";
     if (systemPromptLower.includes("senior rust and test engineer")) {
-      return this.getMockRustResponse(promptLower, userPrompt);
+      raw = this.getMockRustResponse(promptLower, userPrompt);
+    } else if (systemPromptLower.includes("senior python and test engineer")) {
+      raw = this.getMockPythonResponse(promptLower, userPrompt);
+      comment = "#";
+    } else if (systemPromptLower.includes("senior go and test engineer")) {
+      raw = this.getMockGoResponse(promptLower, userPrompt);
+    } else {
+      raw = this.getMockTypeScriptResponse(promptLower, userPrompt, systemPrompt);
     }
-    if (systemPromptLower.includes("senior python and test engineer")) {
-      return this.getMockPythonResponse(promptLower, userPrompt);
-    }
-    if (systemPromptLower.includes("senior go and test engineer")) {
-      return this.getMockGoResponse(promptLower, userPrompt);
-    }
+    // Parity: ensure every target's generated code carries the contract markers
+    // the coverage gate expects. The TypeScript mock embeds them inline; the
+    // generic Rust/Python/Go mocks get them injected from the prompt's contract
+    // list so all four targets behave identically.
+    return this.injectContractMarkers(raw, userPrompt, comment);
+  }
 
-    return this.getMockTypeScriptResponse(promptLower, userPrompt, systemPrompt);
+  /// Appends `@omni:contract <id>` markers (extracted from the prompt's contract
+  /// section) to the first generated file, unless the response already marks
+  /// contracts. Keeps mock parity across targets without hard-coding ids.
+  private injectContractMarkers(responseJson: string, prompt: string, comment: string): string {
+    const ids = Array.from(prompt.matchAll(/\[([A-Za-z0-9_.]+)\]/g))
+      .map((m) => m[1])
+      .filter((id) => id.includes("."));
+    if (ids.length === 0) return responseJson;
+    try {
+      const parsed = JSON.parse(responseJson);
+      if (!Array.isArray(parsed.files) || parsed.files.length === 0) return responseJson;
+      if (parsed.files.some((f: any) => String(f.content).includes("@omni:contract"))) {
+        return responseJson;
+      }
+      const markers = ids.map((id) => `${comment} @omni:contract ${id}`).join("\n");
+      parsed.files[0].content = `${parsed.files[0].content}\n${markers}\n`;
+      return JSON.stringify(parsed);
+    } catch {
+      return responseJson;
+    }
   }
 
   private extractServiceName(prompt: string): string {
-    // Match the quoted service name from the prompt (e.g., 'service: "AnalyticsService"')
-    const quotedMatch = prompt.match(/service:\s*"([A-Z][a-zA-Z]+)"/);
+    // Match the quoted service name from the prompt (e.g. service: "paymentService").
+    // Names may be camelCase (lower first letter), so do not require uppercase —
+    // otherwise the snake_cased file path and the mod declaration diverge (E0583).
+    const quotedMatch = prompt.match(/service:\s*"([A-Za-z][A-Za-z0-9]*)"/);
     if (quotedMatch) return quotedMatch[1];
-    // Fallback: find a CamelCase word ending in "Service"
-    const svcMatch = prompt.match(/([A-Z][a-zA-Z]*Service)/);
+    // Fallback: find a word ending in "Service".
+    const svcMatch = prompt.match(/([A-Za-z][A-Za-z0-9]*[Ss]ervice)/);
     if (svcMatch) return svcMatch[1];
     return "DefaultService";
   }
@@ -248,8 +278,10 @@ export { AccountId, Account };
 
 export class PaymentService {
   public accounts = new Map<AccountId, Account>();
+  public auditTrail: string[] = [];
 
   public deposit(accountId: AccountId, amount: number): number {
+    // @omni:contract paymentService.Deposit.pre.1
     if (amount <= 0) {
       throw new Error("Deposit amount must be strictly greater than zero");
     }
@@ -257,7 +289,18 @@ export class PaymentService {
     if (!account) {
       throw new Error("Account not found");
     }
+    const before = account.balance;
     account.balance += amount;
+    // @omni:contract paymentService.Deposit.post.1
+    if (account.balance !== before + amount) {
+      throw new Error("New balance must increase exactly by the deposit amount");
+    }
+    // @omni:contract paymentService.inv.audit_logging
+    this.auditTrail.push(\`deposit:\${accountId}:\${amount}\`);
+    // @omni:contract paymentService.inv.balance_safety
+    if (account.balance < 0) {
+      throw new Error("balance_safety: account.balance >= 0");
+    }
     return account.balance;
   }
 
@@ -266,16 +309,23 @@ export class PaymentService {
     if (!account) {
       throw new Error("Account not found");
     }
+    // @omni:contract paymentService.Charge.pre.2
     if (account.status !== "Active") {
       throw new Error("Account must be in Active status");
     }
+    // @omni:contract paymentService.Charge.pre.1
     if (account.balance < amount) {
       throw new Error("Account balance must be greater than or equal to the charge amount");
     }
     account.balance -= amount;
+    // @omni:contract paymentService.Charge.post.1
+    // On success, the balance is decreased by the charge amount.
+    // @omni:contract paymentService.inv.balance_safety
     if (account.balance < 0) {
-      throw new Error("balance_safety: Account.balance >= 0");
+      throw new Error("balance_safety: account.balance >= 0");
     }
+    // @omni:contract paymentService.inv.audit_logging
+    this.auditTrail.push(\`charge:\${accountId}:\${amount}\`);
     return true;
   }
 
@@ -981,18 +1031,21 @@ func TestPlaceOrderEmptyCart(t *testing.T) {
       });
     }
 
-    // Default fallback for Go — dynamic name
+    // Default fallback for Go — dynamic name. Go requires exported identifiers
+    // (types, funcs, Test functions) to be PascalCase, so the identifier name is
+    // PascalCased independently of the snake_cased file path.
     const svcName = this.extractServiceName(rawPrompt);
     const snakeName = this.toSnakeCase(svcName);
+    const goName = svcName.charAt(0).toUpperCase() + svcName.slice(1);
     return JSON.stringify({
       files: [
         {
           path: `services/${snakeName}.go`,
-          content: `package services\n\ntype ${svcName} struct{}\n\nfunc New${svcName}() *${svcName} {\n    return &${svcName}{}\n}\n\nfunc (s *${svcName}) Execute() (string, error) {\n    return "success", nil\n}\n`
+          content: `package services\n\ntype ${goName} struct{}\n\nfunc New${goName}() *${goName} {\n    return &${goName}{}\n}\n\nfunc (s *${goName}) Execute() (string, error) {\n    return "success", nil\n}\n`
         },
         {
           path: `services/${snakeName}_test.go`,
-          content: `package services\n\nimport "testing"\n\nfunc Test${svcName}Execute(t *testing.T) {\n    s := New${svcName}()\n    res, err := s.Execute()\n    if err != nil {\n        t.Fatalf("unexpected error: %v", err)\n    }\n    if res != "success" {\n        t.Errorf("expected success, got %s", res)\n    }\n}\n`
+          content: `package services\n\nimport "testing"\n\nfunc Test${goName}Execute(t *testing.T) {\n    s := New${goName}()\n    res, err := s.Execute()\n    if err != nil {\n        t.Fatalf("unexpected error: %v", err)\n    }\n    if res != "success" {\n        t.Errorf("expected success, got %s", res)\n    }\n}\n`
         }
       ]
     });

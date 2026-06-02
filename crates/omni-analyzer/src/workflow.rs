@@ -19,21 +19,17 @@ fn is_wildcard_state(state: &str) -> bool {
 fn get_matching_concrete_states<'a>(wildcard: &str, all_states: &'a [String]) -> Vec<&'a str> {
     let mut matches = Vec::new();
     let except_suffix = "AnyStateExcept";
-    let except_state = if wildcard.starts_with(except_suffix) {
-        Some(&wildcard[except_suffix.len()..])
-    } else {
-        None
-    };
+    let except_state = wildcard.strip_prefix(except_suffix);
 
     for s in all_states {
         let s_str = s.as_str();
         if is_wildcard_state(s_str) {
             continue;
         }
-        if let Some(exc) = except_state {
-            if s_str == exc {
-                continue;
-            }
+        if let Some(exc) = except_state
+            && s_str == exc
+        {
+            continue;
         }
         matches.push(s_str);
     }
@@ -50,6 +46,7 @@ fn validate_workflow_transitions(w: &WorkflowDecl, diagnostics: &mut Vec<Diagnos
             if !states_set.contains(except_state) {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Error,
+                    code: "E0601",
                     message: format!(
                         "Workflow '{}': wildcard transition excepts undefined state '{}'",
                         w.name, except_state
@@ -62,6 +59,7 @@ fn validate_workflow_transitions(w: &WorkflowDecl, diagnostics: &mut Vec<Diagnos
         {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0602",
                 message: format!(
                     "Workflow '{}': transition uses undefined source state '{}'",
                     w.name, trans.from
@@ -74,6 +72,7 @@ fn validate_workflow_transitions(w: &WorkflowDecl, diagnostics: &mut Vec<Diagnos
         if !states_set.contains(trans.to.as_str()) {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0603",
                 message: format!(
                     "Workflow '{}': transition uses undefined target state '{}'",
                     w.name, trans.to
@@ -90,6 +89,7 @@ fn validate_workflow_transitions(w: &WorkflowDecl, diagnostics: &mut Vec<Diagnos
         {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Error,
+                code: "E0604",
                 message: format!(
                     "Workflow '{}': timeout transition uses undefined target state '{}'",
                     w.name, timeout.target_state
@@ -150,6 +150,7 @@ fn detect_dead_states(w: &WorkflowDecl, diagnostics: &mut Vec<Diagnostic>) {
         if !visited.contains(state.as_str()) {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Warning,
+                code: "E0605",
                 message: format!(
                     "Workflow '{}': state '{}' is unreachable (dead state)",
                     w.name, state

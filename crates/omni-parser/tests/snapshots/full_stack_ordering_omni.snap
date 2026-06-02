@@ -1,0 +1,759 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - ordering
+  span:
+    start: 0
+    end: 20
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: userId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 36
+            end: 42
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 22
+        end: 42
+  - Type:
+      name: productId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 60
+            end: 66
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 43
+        end: 66
+  - Type:
+      name: orderId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 82
+            end: 88
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 67
+        end: 88
+  - Type:
+      name: orderItemId
+      type_params: []
+      kind:
+        Alias:
+          name: string
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 108
+            end: 114
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 89
+        end: 114
+  - Type:
+      name: orderItem
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: id
+              ty:
+                name: orderItemId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 145
+                  end: 156
+              default: ~
+              doc_comment: ~
+              span:
+                start: 142
+                end: 156
+            - name: orderId
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 167
+                  end: 174
+              default: ~
+              doc_comment: ~
+              span:
+                start: 159
+                end: 174
+            - name: productId
+              ty:
+                name: productId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 187
+                  end: 196
+              default: ~
+              doc_comment: ~
+              span:
+                start: 177
+                end: 196
+            - name: qty
+              ty:
+                name: int
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 203
+                  end: 206
+              default: ~
+              doc_comment: ~
+              span:
+                start: 199
+                end: 206
+            - name: price
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 215
+                  end: 220
+              default: ~
+              doc_comment: ~
+              span:
+                start: 209
+                end: 220
+          span:
+            start: 139
+            end: 222
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 116
+        end: 222
+  - Type:
+      name: order
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: id
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 247
+                  end: 254
+              default: ~
+              doc_comment: ~
+              span:
+                start: 244
+                end: 254
+            - name: userId
+              ty:
+                name: userId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 264
+                  end: 270
+              default: ~
+              doc_comment: ~
+              span:
+                start: 257
+                end: 270
+            - name: total
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 279
+                  end: 284
+              default: ~
+              doc_comment: ~
+              span:
+                start: 273
+                end: 284
+            - name: status
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 294
+                  end: 300
+              default: ~
+              doc_comment: ~
+              span:
+                start: 287
+                end: 300
+          span:
+            start: 241
+            end: 302
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 222
+        end: 302
+  - Schema:
+      name: orderDb
+      goal: Manage relational data for ordering system
+      target: postgresql
+      entities:
+        - name: user
+          fields:
+            - name: id
+              ty:
+                name: userId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 411
+                  end: 417
+              default: ~
+              decorators:
+                - name: primary
+                  args: []
+                  span:
+                    start: 419
+                    end: 426
+              doc_comment: ~
+              span:
+                start: 408
+                end: 426
+            - name: name
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 436
+                  end: 442
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 431
+                end: 442
+            - name: status
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 454
+                  end: 460
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 447
+                end: 460
+          doc_comment: ~
+          span:
+            start: 399
+            end: 464
+        - name: product
+          fields:
+            - name: id
+              ty:
+                name: productId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 486
+                  end: 495
+              default: ~
+              decorators:
+                - name: primary
+                  args: []
+                  span:
+                    start: 497
+                    end: 504
+              doc_comment: ~
+              span:
+                start: 483
+                end: 504
+            - name: name
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 514
+                  end: 520
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 509
+                end: 520
+            - name: price
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 531
+                  end: 536
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 525
+                end: 536
+          doc_comment: ~
+          span:
+            start: 471
+            end: 540
+        - name: order
+          fields:
+            - name: id
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 560
+                  end: 567
+              default: ~
+              decorators:
+                - name: primary
+                  args: []
+                  span:
+                    start: 569
+                    end: 576
+              doc_comment: ~
+              span:
+                start: 557
+                end: 576
+            - name: userId
+              ty:
+                name: userId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 588
+                  end: 594
+              default: ~
+              decorators:
+                - name: indexed
+                  args: []
+                  span:
+                    start: 596
+                    end: 603
+              doc_comment: ~
+              span:
+                start: 581
+                end: 603
+            - name: total
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 614
+                  end: 619
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 608
+                end: 619
+            - name: status
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 631
+                  end: 637
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 624
+                end: 637
+          doc_comment: ~
+          span:
+            start: 547
+            end: 641
+        - name: orderItem
+          fields:
+            - name: id
+              ty:
+                name: orderItemId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 665
+                  end: 676
+              default: ~
+              decorators:
+                - name: primary
+                  args: []
+                  span:
+                    start: 678
+                    end: 685
+              doc_comment: ~
+              span:
+                start: 662
+                end: 685
+            - name: orderId
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 698
+                  end: 705
+              default: ~
+              decorators:
+                - name: indexed
+                  args: []
+                  span:
+                    start: 707
+                    end: 714
+              doc_comment: ~
+              span:
+                start: 690
+                end: 714
+            - name: productId
+              ty:
+                name: productId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 729
+                  end: 738
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 719
+                end: 738
+            - name: qty
+              ty:
+                name: int
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 747
+                  end: 750
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 743
+                end: 750
+            - name: price
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 761
+                  end: 766
+              default: ~
+              decorators: []
+              doc_comment: ~
+              span:
+                start: 755
+                end: 766
+          doc_comment: ~
+          span:
+            start: 648
+            end: 770
+      relations:
+        - lhs: user
+          rel_type: has_many
+          rhs: order
+          args: []
+          span:
+            start: 787
+            end: 806
+        - lhs: order
+          rel_type: has_many
+          rhs: orderItem
+          args: []
+          span:
+            start: 813
+            end: 837
+      indexes: []
+      constraints: []
+      span:
+        start: 302
+        end: 839
+  - Service:
+      name: orderService
+      goal: Manage customer order life cycle and apply discount policies
+      target: ~
+      constraints: []
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: CreateOrder
+          inputs:
+            - name: userId
+              ty:
+                name: userId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1041
+                  end: 1047
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1034
+                end: 1047
+            - name: items
+              ty:
+                name: list
+                type_args:
+                  - name: orderItem
+                    type_args: []
+                    union_members: []
+                    intersection_members: []
+                    span:
+                      start: 1065
+                      end: 1074
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1060
+                  end: 1075
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1054
+                end: 1075
+          outputs:
+            - name: result
+              ty:
+                name: order
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1102
+                  end: 1107
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1095
+                end: 1107
+          preconditions:
+            - Literal:
+                String: User must exist and have an Active status
+            - Literal:
+                String: At least one item must be present in the order
+            - Literal:
+                String: All product quantities must be strictly positive
+          postconditions:
+            - Literal:
+                String: Order total must be calculated as sum of item prices times quantities
+            - Literal:
+                String: Order status must start as Created
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Creates a new order for a user with the selected items
+          span:
+            start: 994
+            end: 1443
+        - name: ApplyPromoCode
+          inputs:
+            - name: orderId
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1542
+                  end: 1549
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1534
+                end: 1549
+            - name: code
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1561
+                  end: 1567
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1556
+                end: 1567
+          outputs:
+            - name: result
+              ty:
+                name: order
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1594
+                  end: 1599
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1587
+                end: 1599
+          preconditions:
+            - Literal:
+                String: Order must exist and be in Created status
+            - Literal:
+                String: Promo code must be valid
+          postconditions:
+            - Literal:
+                String: "If order total exceeds $100 and user is VIP, apply a 10% discount"
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Applies a promo code to an existing order
+          span:
+            start: 1491
+            end: 1805
+        - name: ProcessRefund
+          inputs:
+            - name: orderId
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1900
+                  end: 1907
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1892
+                end: 1907
+          outputs:
+            - name: success
+              ty:
+                name: bool
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1935
+                  end: 1939
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1927
+                end: 1939
+          preconditions:
+            - Literal:
+                String: Order must be in Paid status to refund
+          postconditions:
+            - Literal:
+                String: Order status is updated to Refunded on success
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: Processes refunds for cancelled orders
+          span:
+            start: 1850
+            end: 2088
+      budget: ~
+      metrics: []
+      invariants:
+        - BinaryOp:
+            left:
+              Identifier:
+                - total_non_negative
+                - start: 2106
+                  end: 2124
+            op: Eq
+            right:
+              Literal:
+                String: order.total >= 0
+            span:
+              start: 2106
+              end: 2144
+        - BinaryOp:
+            left:
+              Identifier:
+                - vip_discount_policy
+                - start: 2151
+                  end: 2170
+            op: Eq
+            right:
+              Literal:
+                String: VIP users get a 10% discount on orders exceeding $100
+            span:
+              start: 2151
+              end: 2227
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 839
+        end: 2228

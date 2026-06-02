@@ -56,6 +56,12 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   },
 };
 
+/** A representative model for each tier (first match in the pricing table). */
+export function modelForTier(tier: ModelTier): string {
+  const match = Object.values(MODEL_PRICING).find((m) => m.tier === tier);
+  return match ? match.model : "claude-3-5-sonnet-20241022";
+}
+
 // ── Budget configuration ─────────────────────────────────
 export interface BudgetConfig {
   /** Maximum total cost in dollars. Build aborts if exceeded. */
@@ -201,10 +207,17 @@ export class BudgetTracker {
   selectModelTier(): ModelTier {
     const remaining = this.getRemainingBudget();
 
+    // Downgrade to the cheapest tier when the budget is nearly exhausted, so a
+    // build degrades gracefully instead of overshooting the limit.
     if (remaining < 0.5) return "CheapFast";
     if (!this.config.allowEscalation) return this.config.preferredTier;
 
     return this.config.preferredTier;
+  }
+
+  /** The model to use given the currently-selected tier. */
+  selectModel(): string {
+    return modelForTier(this.selectModelTier());
   }
 
   /** Generate a cost report */

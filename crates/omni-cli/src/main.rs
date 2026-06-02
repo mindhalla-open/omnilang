@@ -40,6 +40,10 @@ enum Commands {
         /// Path to .omni files or directory to plan.
         #[arg(default_value = ".")]
         path: String,
+
+        /// Output format: 'human' (default) or 'json' (for CI cost reports).
+        #[arg(long, default_value = "human")]
+        format: String,
     },
 
     /// Build: analyze → generate → verify → emit artifacts.
@@ -68,6 +72,11 @@ enum Commands {
         #[arg(long)]
         full_stack: bool,
 
+        /// Reproducible build: reuse cached artifacts only; a cache miss is a
+        /// hard error instead of calling the LLM.
+        #[arg(long)]
+        frozen: bool,
+
         /// Path to federated repositories configuration (TOML).
         #[arg(long)]
         federated: Option<String>,
@@ -78,6 +87,17 @@ enum Commands {
         /// Project name (creates a directory).
         #[arg(default_value = ".")]
         name: String,
+    },
+
+    /// Format `.omni` files in place (canonical brace-free layout).
+    Fmt {
+        /// Path to a `.omni` file or directory.
+        #[arg(default_value = ".")]
+        path: String,
+
+        /// Check only: exit non-zero if any file is not formatted (no writes).
+        #[arg(long)]
+        check: bool,
     },
 
     /// Verify build artifacts: parse test reports and coverage data.
@@ -141,6 +161,21 @@ enum Commands {
         #[arg(default_value = "compliance")]
         output: String,
     },
+
+    /// Deploy a new version of a runtime agent policy (versioned + audited).
+    DeployPolicy {
+        /// Name of the agent/service whose policy is being updated.
+        #[arg(long)]
+        service: String,
+
+        /// Path to the new policy spec (`.omni`).
+        #[arg(long)]
+        spec: String,
+
+        /// Reason for the change (recorded in the audit log).
+        #[arg(long)]
+        reason: String,
+    },
 }
 
 #[derive(Subcommand)]
@@ -154,7 +189,7 @@ fn main() {
 
     let exit_code = match cli.command {
         Commands::Check { path, format } => cmd_check(&path, &format, cli.verbose, cli.quiet),
-        Commands::Plan { path } => cmd_plan(&path),
+        Commands::Plan { path, format } => cmd_plan(&path, &format),
         Commands::Build {
             path,
             target,
@@ -162,6 +197,7 @@ fn main() {
             wire_format,
             budget,
             full_stack,
+            frozen,
             federated,
         } => cmd_build(
             &path,
@@ -170,9 +206,11 @@ fn main() {
             &wire_format,
             budget,
             full_stack,
+            frozen,
             federated.as_deref(),
         ),
         Commands::Init { name } => cmd_init(&name),
+        Commands::Fmt { path, check } => cmd_fmt(&path, check),
         Commands::Verify {
             path,
             report,
@@ -187,6 +225,11 @@ fn main() {
         },
         Commands::Docs { path, output } => cmd_docs(&path, &output),
         Commands::Dashboard { output } => cmd_dashboard(&output),
+        Commands::DeployPolicy {
+            service,
+            spec,
+            reason,
+        } => cmd_deploy_policy(&service, &spec, &reason),
     };
 
     std::process::exit(exit_code);
@@ -194,7 +237,7 @@ fn main() {
 
 fn cmd_check(path: &str, format: &str, verbose: bool, quiet: bool) -> i32 {
     let mut files = collect_omni_files(path);
-    
+
     // Resolve project dependencies
     match resolve_project_dependencies(path) {
         Ok(dep_files) => {
@@ -202,7 +245,11 @@ fn cmd_check(path: &str, format: &str, verbose: bool, quiet: bool) -> i32 {
         }
         Err(e) => {
             if !quiet {
-                eprintln!("{} dependency resolution failed: {}", "error:".red().bold(), e);
+                eprintln!(
+                    "{} dependency resolution failed: {}",
+                    "error:".red().bold(),
+                    e
+                );
             }
             return 1;
         }
@@ -302,13 +349,14 @@ fn cmd_check(path: &str, format: &str, verbose: bool, quiet: bool) -> i32 {
                         "{}",
                         serde_json::json!({
                             "level": "error",
+                            "code": diag.code,
                             "message": diag.message,
                         })
                     );
                 } else if !quiet {
                     eprintln!(
                         "{} {}",
-                        "error:".red().bold(),
+                        format!("error[{}]:", diag.code).red().bold(),
                         diag.message
                     );
                 }
@@ -320,13 +368,14 @@ fn cmd_check(path: &str, format: &str, verbose: bool, quiet: bool) -> i32 {
                         "{}",
                         serde_json::json!({
                             "level": "warning",
+                            "code": diag.code,
                             "message": diag.message,
                         })
                     );
                 } else if !quiet {
                     eprintln!(
                         "{} {}",
-                        "warning:".yellow().bold(),
+                        format!("warning[{}]:", diag.code).yellow().bold(),
                         diag.message
                     );
                 }
@@ -336,7 +385,7 @@ fn cmd_check(path: &str, format: &str, verbose: bool, quiet: bool) -> i32 {
                 if verbose && format != "json" {
                     eprintln!(
                         "{} {}",
-                        "info:".blue().bold(),
+                        format!("info[{}]:", diag.code).blue().bold(),
                         diag.message
                     );
                 }
@@ -386,12 +435,25 @@ fn cmd_check(path: &str, format: &str, verbose: bool, quiet: bool) -> i32 {
     if total_errors > 0 { 1 } else { 0 }
 }
 
-fn cmd_plan(path: &str) -> i32 {
+/// Token-based cost estimate aligned with the runtime's `estimateBuildCost`:
+/// ~2000+ops*500 input and ~4000+tests*300 output tokens per service, priced at
+/// the balanced tier ($0.003/1k input, $0.015/1k output).
+fn estimate_build_cost(service_count: usize, operation_count: usize, test_count: usize) -> f64 {
+    let input = (service_count * (2000 + operation_count * 500)) as f64;
+    let output = (service_count * (4000 + test_count * 300)) as f64;
+    (input / 1000.0) * 0.003 + (output / 1000.0) * 0.015
+}
+
+fn cmd_plan(path: &str, format: &str) -> i32 {
     let mut files = collect_omni_files(path);
 
     // Resolve project dependencies
     if let Err(e) = resolve_project_dependencies(path).map(|dep_files| files.extend(dep_files)) {
-        eprintln!("{} dependency resolution failed: {}", "error:".red().bold(), e);
+        eprintln!(
+            "{} dependency resolution failed: {}",
+            "error:".red().bold(),
+            e
+        );
         return 1;
     }
 
@@ -459,7 +521,11 @@ fn cmd_plan(path: &str) -> i32 {
     if has_errors {
         for diag in &diagnostics {
             if diag.kind == omni_analyzer::DiagnosticKind::Error {
-                eprintln!("{} {}", "error:".red().bold(), diag.message);
+                eprintln!(
+                    "{} {}",
+                    format!("error[{}]:", diag.code).red().bold(),
+                    diag.message
+                );
             }
         }
         eprintln!("{} fix analysis errors first", "error:".red().bold());
@@ -467,6 +533,28 @@ fn cmd_plan(path: &str) -> i32 {
     }
 
     if let Some(ir) = ir {
+        if format == "json" {
+            let est = estimate_build_cost(
+                ir.stats.service_count,
+                ir.stats.operation_count,
+                ir.stats.test_count,
+            );
+            println!(
+                "{}",
+                serde_json::json!({
+                    "module": ir.module_path.join("."),
+                    "services": ir.stats.service_count,
+                    "rpcs": ir.stats.operation_count,
+                    "operations": ir.stats.operation_count,
+                    "tests": ir.stats.test_count,
+                    "types": ir.stats.type_count,
+                    "estimated_cost": format!("{:.4}", est),
+                    "estimated_cost_usd": est,
+                    "estimated_cached_usd": est * 0.125,
+                })
+            );
+            return 0;
+        }
         println!("{}", "📋 Execution Plan".bold());
         println!();
         println!("  Module: {}", ir.module_path.join(".").cyan());
@@ -529,9 +617,7 @@ fn cmd_plan(path: &str) -> i32 {
 
         println!("  {}", "Cache Pre-warming & Hit Stats:".bold());
         println!("    - Shared Cache Status: Pre-warmed & Active");
-        println!(
-            "    - Cache Pre-warm Hit Rate: 87.5% (Pre-check matching on refined schemas)"
-        );
+        println!("    - Cache Pre-warm Hit Rate: 87.5% (Pre-check matching on refined schemas)");
         let warm_time = 0.5 + (complexity as f64 * 0.2);
         let cold_time = 3.0 + (complexity as f64 * 1.5);
         println!(
@@ -595,6 +681,7 @@ fn check_federated_compatibility(repos: &[(&str, &str)]) -> bool {
     all_ok
 }
 
+#[allow(clippy::too_many_arguments)]
 fn cmd_build(
     path: &str,
     target: &str,
@@ -602,6 +689,7 @@ fn cmd_build(
     wire_format: &str,
     budget: Option<f64>,
     full_stack: bool,
+    frozen: bool,
     federated: Option<&str>,
 ) -> i32 {
     println!(
@@ -630,23 +718,18 @@ fn cmd_build(
     }
     // Read budget from omni.toml if not specified on CLI
     let mut final_budget = budget;
-    if final_budget.is_none() {
-        if let Some(manifest_path) = find_omni_toml() {
-            if let Ok(toml_content) = std::fs::read_to_string(manifest_path) {
-                if let Ok(table) = toml_content.parse::<toml::Table>() {
-                    if let Some(budget_val) = table.get("budget") {
-                        if let Some(budget_table) = budget_val.as_table() {
-                            if let Some(max_total_val) = budget_table.get("max_total") {
-                                if let Some(max_total) = max_total_val.as_float() {
-                                    final_budget = Some(max_total);
-                                } else if let Some(max_total) = max_total_val.as_integer() {
-                                    final_budget = Some(max_total as f64);
-                                }
-                            }
-                        }
-                    }
-                }
-            }
+    if final_budget.is_none()
+        && let Some(manifest_path) = find_omni_toml()
+        && let Ok(toml_content) = std::fs::read_to_string(manifest_path)
+        && let Ok(table) = toml_content.parse::<toml::Table>()
+        && let Some(budget_val) = table.get("budget")
+        && let Some(budget_table) = budget_val.as_table()
+        && let Some(max_total_val) = budget_table.get("max_total")
+    {
+        if let Some(max_total) = max_total_val.as_float() {
+            final_budget = Some(max_total);
+        } else if let Some(max_total) = max_total_val.as_integer() {
+            final_budget = Some(max_total as f64);
         }
     }
 
@@ -711,7 +794,11 @@ fn cmd_build(
 
     // Resolve project dependencies
     if let Err(e) = resolve_project_dependencies(path).map(|dep_files| files.extend(dep_files)) {
-        eprintln!("{} dependency resolution failed: {}", "error:".red().bold(), e);
+        eprintln!(
+            "{} dependency resolution failed: {}",
+            "error:".red().bold(),
+            e
+        );
         return 1;
     }
 
@@ -792,19 +879,11 @@ fn cmd_build(
     for diag in &diagnostics {
         match diag.kind {
             omni_analyzer::DiagnosticKind::Error => {
-                eprintln!(
-                    "{} {}",
-                    "error:".red().bold(),
-                    diag.message
-                );
+                eprintln!("{} {}", "error:".red().bold(), diag.message);
                 has_errors = true;
             }
             omni_analyzer::DiagnosticKind::Warning => {
-                eprintln!(
-                    "{} {}",
-                    "warning:".yellow().bold(),
-                    diag.message
-                );
+                eprintln!("{} {}", "warning:".yellow().bold(), diag.message);
             }
             _ => {}
         }
@@ -818,7 +897,10 @@ fn cmd_build(
 
     if let Some(ir) = ir {
         let ir_file_name = if files.len() == 1 {
-            let stem = std::path::Path::new(&files[0]).file_stem().and_then(|s| s.to_str()).unwrap_or("spec");
+            let stem = std::path::Path::new(&files[0])
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("spec");
             format!("{}_ir.json", stem)
         } else {
             "project_ir.json".to_string()
@@ -869,6 +951,9 @@ fn cmd_build(
         if full_stack {
             cmd.arg("--full-stack");
         }
+        if frozen {
+            cmd.arg("--frozen");
+        }
         if let Some(max_budget) = final_budget {
             cmd.arg("--budget").arg(format!("{:.2}", max_budget));
         }
@@ -893,6 +978,211 @@ fn cmd_build(
     }
 
     exit_code
+}
+
+/// Canonical formatting for an OmniLang source file. Deterministic and
+/// idempotent: `format_source(format_source(x)) == format_source(x)`.
+///
+/// The language is layout-sensitive, so this never re-flows block structure; it
+/// only normalizes whitespace safely:
+///   - leading tabs → 4 spaces (the lexer already treats a tab as 4 columns),
+///   - trailing whitespace trimmed,
+///   - runs of blank lines collapsed to a single blank line,
+///   - leading/trailing blank lines removed, file ends with exactly one newline.
+fn format_source(input: &str) -> String {
+    let mut out_lines: Vec<String> = Vec::new();
+    let mut pending_blanks = 0usize;
+    let mut seen_content = false;
+
+    for raw in input.lines() {
+        // Normalize leading tabs to 4 spaces, preserving the rest of the line.
+        let indent_end = raw.len() - raw.trim_start_matches([' ', '\t']).len();
+        let (indent, rest) = raw.split_at(indent_end);
+        let normalized_indent = indent.replace('\t', "    ");
+        let line = format!("{}{}", normalized_indent, rest.trim_end());
+
+        if line.trim().is_empty() {
+            if seen_content {
+                pending_blanks += 1;
+            }
+            continue;
+        }
+        // Collapse any run of blank lines to a single separator.
+        if seen_content && pending_blanks > 0 {
+            out_lines.push(String::new());
+        }
+        pending_blanks = 0;
+        seen_content = true;
+        out_lines.push(line);
+    }
+
+    if out_lines.is_empty() {
+        return String::new();
+    }
+    format!("{}\n", out_lines.join("\n"))
+}
+
+fn cmd_fmt(path: &str, check: bool) -> i32 {
+    let files = collect_omni_files(path);
+    if files.is_empty() {
+        eprintln!(
+            "{} no .omni files found in '{}'",
+            "error:".red().bold(),
+            path
+        );
+        return 1;
+    }
+    let mut changed = 0;
+    for file in &files {
+        let Ok(source) = std::fs::read_to_string(file) else {
+            eprintln!("{} cannot read '{}'", "error:".red().bold(), file);
+            return 1;
+        };
+        let formatted = format_source(&source);
+        if formatted != source {
+            changed += 1;
+            if check {
+                println!("{} {}", "would reformat:".yellow(), file);
+            } else if let Err(e) = std::fs::write(file, &formatted) {
+                eprintln!("{} cannot write '{}': {}", "error:".red().bold(), file, e);
+                return 1;
+            } else {
+                println!("{} {}", "formatted:".green(), file);
+            }
+        }
+    }
+    if check && changed > 0 {
+        eprintln!("{} {} file(s) need formatting", "✗".red(), changed);
+        return 1;
+    }
+    println!(
+        "{} {} file(s) checked, {} {}",
+        "✅".green(),
+        files.len(),
+        changed,
+        if check { "would change" } else { "formatted" }
+    );
+    0
+}
+
+/// Deploys a new version of a runtime agent policy: validates the spec, archives
+/// it as `policies/<service>/v<N>.omni`, and appends an audit-log entry. This is
+/// the versioning/audit half of hot-reload (loading it into a running service is
+/// the runtime interpreter's job).
+/// Returns the next policy version for a `policies/<service>/` directory by
+/// scanning existing `v<N>.omni` files and taking `max(N) + 1` (1 if none).
+/// Pure over the filesystem and testable.
+fn next_policy_version(dir: &Path) -> u32 {
+    let mut max_ver = 0u32;
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            if let Some(name) = entry.file_name().to_str()
+                && let Some(num) = name
+                    .strip_prefix('v')
+                    .and_then(|s| s.strip_suffix(".omni"))
+                    .and_then(|s| s.parse::<u32>().ok())
+            {
+                max_ver = max_ver.max(num);
+            }
+        }
+    }
+    max_ver + 1
+}
+
+fn cmd_deploy_policy(service: &str, spec: &str, reason: &str) -> i32 {
+    // 1. Validate the new policy spec before accepting it.
+    let source = match std::fs::read_to_string(spec) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "{} cannot read spec '{}': {}",
+                "error:".red().bold(),
+                spec,
+                e
+            );
+            return 1;
+        }
+    };
+    let (tokens, lex_errors) = omni_parser::Lexer::new(&source).tokenize();
+    let (file, parse_errors) = omni_parser::parser::Parser::new(tokens).parse();
+    if !lex_errors.is_empty() || !parse_errors.is_empty() {
+        eprintln!(
+            "{} policy spec has parse errors; refusing to deploy",
+            "error:".red().bold()
+        );
+        return 1;
+    }
+    let (_ir, diags) = omni_analyzer::analyze(&file);
+    if diags
+        .iter()
+        .any(|d| d.kind == omni_analyzer::DiagnosticKind::Error)
+    {
+        eprintln!(
+            "{} policy spec has analysis errors; refusing to deploy",
+            "error:".red().bold()
+        );
+        return 1;
+    }
+
+    // 2. Determine the next version under policies/<service>/.
+    let dir = Path::new("policies").join(service);
+    if let Err(e) = std::fs::create_dir_all(&dir) {
+        eprintln!(
+            "{} cannot create '{}': {}",
+            "error:".red().bold(),
+            dir.display(),
+            e
+        );
+        return 1;
+    }
+    let version = next_policy_version(&dir);
+
+    // 3. Archive the new version.
+    let version_path = dir.join(format!("v{}.omni", version));
+    if let Err(e) = std::fs::write(&version_path, &source) {
+        eprintln!(
+            "{} cannot write '{}': {}",
+            "error:".red().bold(),
+            version_path.display(),
+            e
+        );
+        return 1;
+    }
+
+    // 4. Append an audit-log entry.
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let entry = serde_json::json!({
+        "version": version,
+        "service": service,
+        "reason": reason,
+        "spec": version_path.to_string_lossy(),
+        "timestamp": ts,
+    });
+    let audit_path = dir.join("audit.jsonl");
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&audit_path)
+    {
+        use std::io::Write;
+        let _ = writeln!(f, "{}", entry);
+    }
+
+    println!(
+        "{} Policy deployed for service '{}'",
+        "✅".green(),
+        service.cyan()
+    );
+    println!("   Version:   v{}", version);
+    if version > 1 {
+        println!("   Previous:  v{} (archived)", version - 1);
+    }
+    println!("   Reason:    {}", reason);
+    println!("   Audit log: {}", audit_path.display());
+    0
 }
 
 fn cmd_init(name: &str) -> i32 {
@@ -1370,43 +1660,45 @@ fn print_human_report(
 
 fn resolve_project_dependencies(project_path: &str) -> Result<Vec<String>, String> {
     let mut dependency_files = Vec::new();
-    
+
     let p = Path::new(project_path);
     let manifest_path = if p.is_dir() && p.join("omni.toml").is_file() {
         Some(p.join("omni.toml"))
-    } else if p.is_file() && p.parent().is_some_and(|parent| parent.join("omni.toml").is_file()) {
+    } else if p.is_file()
+        && p.parent()
+            .is_some_and(|parent| parent.join("omni.toml").is_file())
+    {
         Some(p.parent().unwrap().join("omni.toml"))
     } else {
         find_omni_toml()
     };
-    
-    if let Some(manifest_path) = manifest_path {
-        if let Ok(toml_content) = std::fs::read_to_string(&manifest_path) {
-            if let Ok(manifest) = omni_analyzer::module_system::parse_manifest(&toml_content) {
-                let project_root = manifest_path.parent().unwrap();
-                for dep in &manifest.dependencies {
-                    if let Some(path_val) = &dep.path {
-                        let dep_path = project_root.join(path_val);
-                        if dep_path.exists() {
-                            let collected = collect_omni_files(&dep_path.to_string_lossy());
-                            dependency_files.extend(collected);
-                        }
-                    } else if let Some(git_url) = &dep.git {
-                        let dep_cache_path = resolve_git_dependency(
-                            &dep.name,
-                            git_url,
-                            dep.tag.as_deref(),
-                            dep.branch.as_deref(),
-                            dep.rev.as_deref(),
-                        )?;
-                        let collected = collect_omni_files(&dep_cache_path.to_string_lossy());
-                        dependency_files.extend(collected);
-                    }
+
+    if let Some(manifest_path) = manifest_path
+        && let Ok(toml_content) = std::fs::read_to_string(&manifest_path)
+        && let Ok(manifest) = omni_analyzer::module_system::parse_manifest(&toml_content)
+    {
+        let project_root = manifest_path.parent().unwrap();
+        for dep in &manifest.dependencies {
+            if let Some(path_val) = &dep.path {
+                let dep_path = project_root.join(path_val);
+                if dep_path.exists() {
+                    let collected = collect_omni_files(&dep_path.to_string_lossy());
+                    dependency_files.extend(collected);
                 }
+            } else if let Some(git_url) = &dep.git {
+                let dep_cache_path = resolve_git_dependency(
+                    &dep.name,
+                    git_url,
+                    dep.tag.as_deref(),
+                    dep.branch.as_deref(),
+                    dep.rev.as_deref(),
+                )?;
+                let collected = collect_omni_files(&dep_cache_path.to_string_lossy());
+                dependency_files.extend(collected);
             }
         }
     }
-    
+
     Ok(dependency_files)
 }
 
@@ -1419,9 +1711,12 @@ fn resolve_git_dependency(
 ) -> Result<PathBuf, String> {
     let cache_dir = Path::new(".omni-cache").join("deps");
     if let Err(e) = std::fs::create_dir_all(&cache_dir) {
-        return Err(format!("failed to create dependency cache directory: {}", e));
+        return Err(format!(
+            "failed to create dependency cache directory: {}",
+            e
+        ));
     }
-    
+
     let dep_dir = cache_dir.join(dep_name);
     if dep_dir.exists() {
         let output = std::process::Command::new("git")
@@ -1451,24 +1746,16 @@ fn resolve_git_dependency(
             ));
         }
     }
-    
-    let ref_target = if let Some(t) = tag {
-        t
-    } else if let Some(b) = branch {
-        b
-    } else if let Some(r) = rev {
-        r
-    } else {
-        "HEAD"
-    };
-    
+
+    let ref_target = tag.or(branch).or(rev).unwrap_or("HEAD");
+
     let output = std::process::Command::new("git")
         .arg("checkout")
         .arg(ref_target)
         .current_dir(&dep_dir)
         .output()
         .map_err(|e| format!("failed to execute git checkout: {}", e))?;
-        
+
     if !output.status.success() {
         return Err(format!(
             "git checkout '{}' failed for dependency '{}': {}",
@@ -1477,7 +1764,7 @@ fn resolve_git_dependency(
             String::from_utf8_lossy(&output.stderr)
         ));
     }
-    
+
     Ok(dep_dir)
 }
 
@@ -1696,7 +1983,11 @@ fn cmd_publish(path: &str) -> i32 {
     // 1. Run check internally
     let mut files = collect_omni_files(path);
     if let Err(e) = resolve_project_dependencies(path).map(|dep_files| files.extend(dep_files)) {
-        eprintln!("{} dependency resolution failed: {}", "error:".red().bold(), e);
+        eprintln!(
+            "{} dependency resolution failed: {}",
+            "error:".red().bold(),
+            e
+        );
         return 1;
     }
 
@@ -1943,7 +2234,110 @@ fn cmd_agents_benchmark() -> i32 {
     );
     println!("------------------------------------------------------------");
     println!("All community agents pass standard security scans & sandboxing checks.");
+
+    print_self_correction_analytics();
     0
+}
+
+/// Aggregates real self-correction analytics from `.omni-cache/traces/` (written
+/// by the runtime's AgentOptimizer) and prints success rate, average attempts,
+/// and a breakdown of failure categories.
+/// Deterministically classifies a diagnostic string into a failure category.
+fn classify_trace_error(e: &str) -> &'static str {
+    let l = e.to_lowercase();
+    if l.contains("contract coverage") {
+        "contract"
+    } else if l.contains("has no exported member") || l.contains("cannot find") {
+        "import"
+    } else if l.contains("error ts") || l.contains("not assignable") {
+        "type"
+    } else if l.contains("expect") || l.contains("test") {
+        "test"
+    } else {
+        "other"
+    }
+}
+
+#[derive(Debug, Default, PartialEq)]
+struct TraceMetrics {
+    total: u64,
+    succeeded: u64,
+    retried: u64,
+    attempts_sum: u64,
+    categories: std::collections::BTreeMap<&'static str, u64>,
+}
+
+/// Aggregates self-correction trace files (`<dir>/*.json`, excluding
+/// `retries.json`) into summary metrics. Pure over the filesystem and testable.
+fn aggregate_trace_metrics(traces_dir: &Path) -> TraceMetrics {
+    let mut m = TraceMetrics::default();
+    let Ok(entries) = std::fs::read_dir(traces_dir) else {
+        return m;
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|e| e.to_str()) != Some("json")
+            || path.file_name().and_then(|n| n.to_str()) == Some("retries.json")
+        {
+            continue;
+        }
+        let Ok(content) = std::fs::read_to_string(&path) else {
+            continue;
+        };
+        let Ok(v) = serde_json::from_str::<serde_json::Value>(&content) else {
+            continue;
+        };
+        m.total += 1;
+        if v.get("success").and_then(|s| s.as_bool()).unwrap_or(false) {
+            m.succeeded += 1;
+        }
+        let attempts = v.get("attempts").and_then(|a| a.as_u64()).unwrap_or(0);
+        m.attempts_sum += attempts;
+        if attempts > 1 {
+            m.retried += 1;
+        }
+        if let Some(errs) = v.get("errors").and_then(|e| e.as_array()) {
+            for err in errs {
+                if let Some(s) = err.as_str() {
+                    *m.categories.entry(classify_trace_error(s)).or_insert(0) += 1;
+                }
+            }
+        }
+    }
+    m
+}
+
+fn print_self_correction_analytics() {
+    let traces_dir = std::path::Path::new(".omni-cache").join("traces");
+    println!();
+    println!(
+        "{}",
+        "📊 Self-Correction Analytics (from .omni-cache/traces)"
+            .bold()
+            .yellow()
+    );
+    println!("------------------------------------------------------------");
+
+    let m = aggregate_trace_metrics(&traces_dir);
+    if m.total == 0 {
+        println!("  No build traces found. Run `omni build` to populate.");
+        println!("------------------------------------------------------------");
+        return;
+    }
+
+    let rate = (m.succeeded as f64 / m.total as f64) * 100.0;
+    let avg = m.attempts_sum as f64 / m.total as f64;
+    println!("  Builds traced:      {}", m.total);
+    println!("  Success rate:       {:.1}%", rate);
+    println!("  Avg attempts:       {:.2}", avg);
+    println!("  Needed correction:  {}", m.retried);
+    if !m.categories.is_empty() {
+        println!("  Failure categories:");
+        for (cat, count) in &m.categories {
+            println!("    {: <10} {}", cat, count);
+        }
+    }
+    println!("------------------------------------------------------------");
 }
 
 fn cmd_docs(path: &str, output: &str) -> i32 {
@@ -1986,7 +2380,11 @@ fn cmd_docs(path: &str, output: &str) -> i32 {
     // 4. Collect and process files
     let mut files = collect_omni_files(path);
     if let Err(e) = resolve_project_dependencies(path).map(|dep_files| files.extend(dep_files)) {
-        eprintln!("{} dependency resolution failed: {}", "error:".red().bold(), e);
+        eprintln!(
+            "{} dependency resolution failed: {}",
+            "error:".red().bold(),
+            e
+        );
         return 1;
     }
 
@@ -2072,7 +2470,10 @@ fn cmd_docs(path: &str, output: &str) -> i32 {
 
     if let Some(ir) = ir {
         let ir_file_name = if files.len() == 1 {
-            let stem = std::path::Path::new(&files[0]).file_stem().and_then(|s| s.to_str()).unwrap_or("spec");
+            let stem = std::path::Path::new(&files[0])
+                .file_stem()
+                .and_then(|s| s.to_str())
+                .unwrap_or("spec");
             format!("{}_ir.json", stem)
         } else {
             "project_ir.json".to_string()
@@ -2603,12 +3004,66 @@ fn cmd_dashboard(output: &str) -> i32 {
 
     let _ = std::fs::write(output_dir.join("index.html"), html);
 
+    // Real, evidence-backed build metrics (not the static compliance samples
+    // above): aggregated from the last build report, traces, and Z3 proofs.
+    write_real_build_metrics(output_dir);
+
     println!(
         "{} Compliance report dashboard generated successfully at: {}",
         "✓".green().bold(),
         output_dir.join("index.html").to_string_lossy().cyan()
     );
     0
+}
+
+/// Writes `build_metrics.json` to the dashboard from real artifacts: the latest
+/// `build/build-report.json`, the self-correction traces, and the Z3 proof
+/// certificates. Grounds the dashboard in actual evidence.
+fn write_real_build_metrics(output_dir: &Path) {
+    let last_build = std::fs::read_to_string("build/build-report.json")
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok());
+
+    let trace_count = std::fs::read_dir(".omni-cache/traces")
+        .map(|rd| {
+            rd.flatten()
+                .filter(|e| {
+                    let n = e.file_name();
+                    let n = n.to_string_lossy();
+                    n.ends_with(".json") && n != "retries.json"
+                })
+                .count()
+        })
+        .unwrap_or(0);
+
+    let proof_count = std::fs::read_dir(".omni-cache/proofs")
+        .map(|rd| {
+            rd.flatten()
+                .filter(|e| e.file_name().to_string_lossy().ends_with(".smt2"))
+                .count()
+        })
+        .unwrap_or(0);
+
+    let metrics = serde_json::json!({
+        "source": "build/build-report.json, .omni-cache/traces, .omni-cache/proofs",
+        "last_build": last_build,
+        "trace_count": trace_count,
+        "z3_proof_certificates": proof_count,
+    });
+    let _ = std::fs::write(
+        output_dir.join("build_metrics.json"),
+        serde_json::to_string_pretty(&metrics).unwrap_or_default(),
+    );
+    println!(
+        "   Real build metrics: {} trace(s), {} Z3 certificate(s){}",
+        trace_count,
+        proof_count,
+        if last_build.is_some() {
+            ", last build report attached"
+        } else {
+            " (no build report yet)"
+        }
+    );
 }
 
 fn find_omni_toml() -> Option<PathBuf> {
@@ -2626,45 +3081,42 @@ fn find_omni_toml() -> Option<PathBuf> {
 }
 
 fn inject_omni_toml_dependencies(file: &mut omni_parser::ast::SourceFile) {
-    if let Some(manifest_path) = find_omni_toml() {
-        if let Ok(toml_content) = std::fs::read_to_string(manifest_path) {
-            if let Ok(table) = toml_content.parse::<toml::Table>() {
-                if let Some(target_val) = table.get("target") {
-                    if let Some(target_table) = target_val.as_table() {
-                        let mut entries = Vec::new();
-                        for (target_name, target_cfg) in target_table {
-                            if let Some(deps_val) = target_cfg.get("dependencies") {
-                                if let Some(deps_table) = deps_val.as_table() {
-                                    let mut packages = Vec::new();
-                                    for (pkg_name, pkg_ver) in deps_table {
-                                        if let Some(ver_str) = pkg_ver.as_str() {
-                                            packages.push(omni_parser::ast::DependencyPackage {
-                                                name: pkg_name.clone(),
-                                                version: ver_str.to_string(),
-                                                span: omni_parser::Span { start: 0, end: 0 },
-                                            });
-                                        }
-                                    }
-                                    entries.push(omni_parser::ast::TargetDependencyEntry {
-                                        target: target_name.clone(),
-                                        packages,
-                                        span: omni_parser::Span { start: 0, end: 0 },
-                                    });
-                                }
-                            }
-                        }
-                        if !entries.is_empty() {
-                            let decl = omni_parser::ast::Declaration::TargetDependencies(
-                                omni_parser::ast::TargetDependenciesDecl {
-                                    entries,
-                                    span: omni_parser::Span { start: 0, end: 0 },
-                                },
-                            );
-                            file.declarations.push(decl);
-                        }
+    if let Some(manifest_path) = find_omni_toml()
+        && let Ok(toml_content) = std::fs::read_to_string(manifest_path)
+        && let Ok(table) = toml_content.parse::<toml::Table>()
+        && let Some(target_val) = table.get("target")
+        && let Some(target_table) = target_val.as_table()
+    {
+        let mut entries = Vec::new();
+        for (target_name, target_cfg) in target_table {
+            if let Some(deps_val) = target_cfg.get("dependencies")
+                && let Some(deps_table) = deps_val.as_table()
+            {
+                let mut packages = Vec::new();
+                for (pkg_name, pkg_ver) in deps_table {
+                    if let Some(ver_str) = pkg_ver.as_str() {
+                        packages.push(omni_parser::ast::DependencyPackage {
+                            name: pkg_name.clone(),
+                            version: ver_str.to_string(),
+                            span: omni_parser::Span { start: 0, end: 0 },
+                        });
                     }
                 }
+                entries.push(omni_parser::ast::TargetDependencyEntry {
+                    target: target_name.clone(),
+                    packages,
+                    span: omni_parser::Span { start: 0, end: 0 },
+                });
             }
+        }
+        if !entries.is_empty() {
+            let decl = omni_parser::ast::Declaration::TargetDependencies(
+                omni_parser::ast::TargetDependenciesDecl {
+                    entries,
+                    span: omni_parser::Span { start: 0, end: 0 },
+                },
+            );
+            file.declarations.push(decl);
         }
     }
 }
@@ -2672,6 +3124,34 @@ fn inject_omni_toml_dependencies(file: &mut omni_parser::ast::SourceFile) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn format_source_normalizes_whitespace() {
+        let input = "module m\n\n\n\nservice s\n\tgoal \"x\"   \n\n\n";
+        let out = format_source(input);
+        // tabs -> 4 spaces, trailing ws trimmed, blank runs collapsed, single trailing \n
+        assert_eq!(out, "module m\n\nservice s\n    goal \"x\"\n");
+    }
+
+    #[test]
+    fn format_source_is_idempotent() {
+        let input = "module m\n\n\nservice s\n\t\toperation Op\n  \n";
+        let once = format_source(input);
+        let twice = format_source(&once);
+        assert_eq!(once, twice, "formatting must be idempotent");
+    }
+
+    #[test]
+    fn format_source_handles_empty_and_blank() {
+        assert_eq!(format_source(""), "");
+        assert_eq!(format_source("\n\n  \n"), "");
+    }
+
+    #[test]
+    fn format_source_preserves_already_formatted() {
+        let formatted = "module m\n\nservice s\n    goal \"x\"\n";
+        assert_eq!(format_source(formatted), formatted);
+    }
 
     #[test]
     fn test_parse_junit_suites() {
@@ -2741,7 +3221,8 @@ mod tests {
             .expect("failed to get parent of omni.toml");
         let path = root.join("examples").join("simple_greet.omni");
         let path_str = path.to_string_lossy();
-        assert_eq!(cmd_plan(&path_str), 0);
+        assert_eq!(cmd_plan(&path_str, "human"), 0);
+        assert_eq!(cmd_plan(&path_str, "json"), 0);
     }
 
     #[test]
@@ -2764,5 +3245,107 @@ mod tests {
             .iter()
             .any(|decl| matches!(decl, omni_parser::ast::Declaration::TargetDependencies(_)));
         assert!(has_deps);
+    }
+
+    /// Creates a fresh, uniquely-named temp directory for a test and removes any
+    /// stale copy first. Process-id + test-tag keeps parallel tests isolated.
+    fn fresh_temp_dir(tag: &str) -> std::path::PathBuf {
+        let dir =
+            std::env::temp_dir().join(format!("omni-cli-test-{}-{}", std::process::id(), tag));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("failed to create temp dir");
+        dir
+    }
+
+    #[test]
+    fn classify_trace_error_categorizes_known_kinds() {
+        assert_eq!(
+            classify_trace_error("Contract coverage gate failed: 2/3"),
+            "contract"
+        );
+        assert_eq!(
+            classify_trace_error("module has no exported member 'Foo'"),
+            "import"
+        );
+        assert_eq!(classify_trace_error("Cannot find name 'bar'"), "import");
+        assert_eq!(
+            classify_trace_error("error TS2322: Type X is not assignable to Y"),
+            "type"
+        );
+        assert_eq!(classify_trace_error("expect(received).toBe(...)"), "test");
+        assert_eq!(classify_trace_error("segfault in libc"), "other");
+    }
+
+    #[test]
+    fn aggregate_trace_metrics_missing_dir_is_empty() {
+        let dir = std::env::temp_dir().join("omni-cli-test-does-not-exist-zzz");
+        let _ = std::fs::remove_dir_all(&dir);
+        let m = aggregate_trace_metrics(&dir);
+        assert_eq!(m, TraceMetrics::default());
+        assert_eq!(m.total, 0);
+    }
+
+    #[test]
+    fn aggregate_trace_metrics_summarizes_traces() {
+        let dir = fresh_temp_dir("traces");
+        // One successful single-attempt build.
+        std::fs::write(
+            dir.join("a.json"),
+            r#"{"success": true, "attempts": 1, "errors": []}"#,
+        )
+        .unwrap();
+        // One build that needed two attempts with a type + contract error.
+        std::fs::write(
+            dir.join("b.json"),
+            r#"{"success": true, "attempts": 2, "errors": ["error TS2322: not assignable", "Contract coverage gate failed"]}"#,
+        )
+        .unwrap();
+        // A failed build.
+        std::fs::write(
+            dir.join("c.json"),
+            r#"{"success": false, "attempts": 3, "errors": ["Cannot find module"]}"#,
+        )
+        .unwrap();
+        // retries.json and non-json files must be ignored.
+        std::fs::write(dir.join("retries.json"), r#"{"success": true}"#).unwrap();
+        std::fs::write(dir.join("notes.txt"), "ignore me").unwrap();
+
+        let m = aggregate_trace_metrics(&dir);
+        assert_eq!(m.total, 3);
+        assert_eq!(m.succeeded, 2);
+        assert_eq!(m.retried, 2); // b (2) and c (3) have attempts > 1
+        assert_eq!(m.attempts_sum, 6);
+        assert_eq!(m.categories.get("type"), Some(&1));
+        assert_eq!(m.categories.get("contract"), Some(&1));
+        assert_eq!(m.categories.get("import"), Some(&1));
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn next_policy_version_empty_dir_starts_at_one() {
+        let dir = fresh_temp_dir("policy-empty");
+        assert_eq!(next_policy_version(&dir), 1);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn next_policy_version_increments_past_highest() {
+        let dir = fresh_temp_dir("policy-versions");
+        std::fs::write(dir.join("v1.omni"), "module m").unwrap();
+        std::fs::write(dir.join("v2.omni"), "module m").unwrap();
+        std::fs::write(dir.join("v7.omni"), "module m").unwrap();
+        // Unrelated files must not affect the count.
+        std::fs::write(dir.join("audit.jsonl"), "{}").unwrap();
+        std::fs::write(dir.join("vX.omni"), "module m").unwrap();
+        assert_eq!(next_policy_version(&dir), 8);
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn next_policy_version_missing_dir_starts_at_one() {
+        let dir = std::env::temp_dir().join("omni-cli-test-policy-missing-zzz");
+        let _ = std::fs::remove_dir_all(&dir);
+        assert_eq!(next_policy_version(&dir), 1);
     }
 }

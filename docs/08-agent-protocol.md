@@ -599,13 +599,12 @@ OmniLang maps task complexity to model tiers automatically based on the spec:
 ### Tier Override in Specs
 
 ```omnilang
-service PasswordHasher {
-  goal: "Hash and verify passwords"
+service PasswordHasher
+  goal "Hash and verify passwords"
 
-  budget:
-    model_tier: SmartExpensive  // force frontier model for security
+  budget
+    model_tier SmartExpensive  // force frontier model for security
     // This overrides the automatic tier selection
-}
 ```
 
 ---
@@ -663,29 +662,28 @@ role = "adversarial"  # generates tricky test inputs
 Teams can register custom agents for domain-specific tasks:
 
 ```omnilang
-agent FinancialComplianceChecker {
-  goal: "Verify financial calculations comply with regulations"
+agent FinancialComplianceChecker
+  goal "Verify financial calculations comply with regulations"
 
-  capabilities:
+  capabilities
     - verify_financial_accuracy
     - check_rounding_rules
     - validate_tax_calculations
 
-  tools:
+  tools
     - FinancialCalculator
     - TaxRuleEngine
     - AuditTrailVerifier
 
-  activation:
-    when: service has constraint "financial_accuracy"
-    or: service handles type Money
+  activation
+    when service has constraint "financial_accuracy"
+    or service handles type Money
 
-  checks:
+  checks
     - all monetary calculations use Decimal, not Float
     - rounding follows Banker's Rounding (IEEE 754)
     - tax calculations match jurisdiction rules
     - audit trail captures all monetary state changes
-}
 ```
 
 ---
@@ -780,11 +778,10 @@ See [Compilation Model — Sandbox Environment](./05-compilation-model.md#sandbo
 Agents never receive actual secrets. Specs reference secrets by name:
 
 ```omnilang
-service Database {
-  connection:
-    host: env("DB_HOST")
-    password: secret("db_password")  // agent sees the reference, not the value
-}
+service Database
+  connection
+    host env("DB_HOST")
+    password secret("db_password")  // agent sees the reference, not the value
 ```
 
 The orchestrator resolves secrets only during verification (in a secure runtime) — never in the agent prompt.

@@ -62,6 +62,7 @@ fn detect_breaking_changes_from_old_ir(
                             if !still_exists {
                                 diagnostics.push(Diagnostic {
                                     kind: DiagnosticKind::Error,
+                                    code: "E0701",
                                     message: format!(
                                         "Schema Breaking Change: Entity '{}' was removed from schema '{}'. This is a breaking change.",
                                         old_entity_name, new_schema.name
@@ -90,6 +91,7 @@ fn detect_breaking_changes_from_old_ir(
                                                 None => {
                                                     diagnostics.push(Diagnostic {
                                                         kind: DiagnosticKind::Error,
+                                                        code: "E0702",
                                                         message: format!(
                                                             "Schema Breaking Change: Field '{}.{}' was removed from schema '{}'. This is a breaking change.",
                                                             old_entity_name, old_field_name, new_schema.name
@@ -106,6 +108,7 @@ fn detect_breaking_changes_from_old_ir(
                                                     {
                                                         diagnostics.push(Diagnostic {
                                                             kind: DiagnosticKind::Error,
+                                                            code: "E0703",
                                                             message: format!(
                                                                 "Schema Breaking Change: Field '{}.{}' changed type from '{}' to '{}' in schema '{}'. This is a breaking change.",
                                                                 old_entity_name, old_field_name, old_type_name, nf.ty.name, new_schema.name
@@ -144,6 +147,7 @@ fn validate_schema_constraints(s: &SchemaDecl, diagnostics: &mut Vec<Diagnostic>
         if !has_rls {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Info,
+                code: "E0704",
                 message: format!(
                     "Schema Validation: Entity '{}' does not enable Row Level Security (RLS). Consider adding @row_level_security decorator.",
                     entity.name
@@ -155,6 +159,7 @@ fn validate_schema_constraints(s: &SchemaDecl, diagnostics: &mut Vec<Diagnostic>
         if !has_soft_delete {
             diagnostics.push(Diagnostic {
                 kind: DiagnosticKind::Info,
+                code: "E0705",
                 message: format!(
                     "Schema Validation: Entity '{}' does not enable soft deletes. Deletes will be permanent.",
                     entity.name

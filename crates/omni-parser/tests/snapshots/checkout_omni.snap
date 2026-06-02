@@ -1,0 +1,536 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - acme
+    - checkout
+  span:
+    start: 0
+    end: 20
+imports: []
+exports: []
+declarations:
+  - Type:
+      name: orderId
+      type_params: []
+      kind:
+        Alias:
+          name: uuid
+          type_args: []
+          union_members: []
+          intersection_members: []
+          span:
+            start: 37
+            end: 41
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 22
+        end: 41
+  - Type:
+      name: orderStatus
+      type_params: []
+      kind:
+        Enum:
+          variants:
+            - name: Draft
+              fields: []
+              span:
+                start: 69
+                end: 74
+            - name: Pending
+              fields: []
+              span:
+                start: 77
+                end: 84
+            - name: Confirmed
+              fields: []
+              span:
+                start: 87
+                end: 96
+            - name: Shipped
+              fields: []
+              span:
+                start: 99
+                end: 106
+            - name: Delivered
+              fields: []
+              span:
+                start: 109
+                end: 118
+            - name: Cancelled
+              fields: []
+              span:
+                start: 121
+                end: 130
+          span:
+            start: 66
+            end: 132
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 43
+        end: 132
+  - Type:
+      name: orderItem
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: product_id
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 169
+                  end: 175
+              default: ~
+              doc_comment: ~
+              span:
+                start: 158
+                end: 175
+            - name: quantity
+              ty:
+                name: int
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 187
+                  end: 190
+              default: ~
+              doc_comment: ~
+              span:
+                start: 178
+                end: 190
+            - name: unit_price
+              ty:
+                name: decimal
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 204
+                  end: 211
+              default: ~
+              doc_comment: ~
+              span:
+                start: 193
+                end: 211
+          span:
+            start: 155
+            end: 213
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 132
+        end: 213
+  - Type:
+      name: order
+      type_params: []
+      kind:
+        Struct:
+          fields:
+            - name: id
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 238
+                  end: 245
+              default: ~
+              doc_comment: ~
+              span:
+                start: 235
+                end: 245
+            - name: customer_id
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 260
+                  end: 266
+              default: ~
+              doc_comment: ~
+              span:
+                start: 248
+                end: 266
+            - name: items
+              ty:
+                name: list
+                type_args:
+                  - name: orderItem
+                    type_args: []
+                    union_members: []
+                    intersection_members: []
+                    span:
+                      start: 280
+                      end: 289
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 275
+                  end: 290
+              default: ~
+              doc_comment: ~
+              span:
+                start: 269
+                end: 290
+            - name: status
+              ty:
+                name: orderStatus
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 300
+                  end: 311
+              default: ~
+              doc_comment: ~
+              span:
+                start: 293
+                end: 311
+            - name: total
+              ty:
+                name: decimal
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 320
+                  end: 327
+              default: ~
+              doc_comment: ~
+              span:
+                start: 314
+                end: 327
+            - name: created_at
+              ty:
+                name: datetime
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 341
+                  end: 349
+              default: ~
+              doc_comment: ~
+              span:
+                start: 330
+                end: 349
+          span:
+            start: 232
+            end: 351
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 213
+        end: 351
+  - Service:
+      name: checkout
+      goal: Process customer orders with payment validation
+      target: ~
+      constraints:
+        - name: idempotent
+          args: []
+          span:
+            start: 447
+            end: 457
+        - name: latency
+          args:
+            - name: p95
+              value:
+                Literal:
+                  Duration: 200ms
+              span:
+                start: 472
+                end: 482
+          span:
+            start: 464
+            end: 483
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: PlaceOrder
+          inputs:
+            - name: customer_id
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 672
+                  end: 678
+              default: ~
+              doc_comment: ~
+              span:
+                start: 660
+                end: 678
+            - name: items
+              ty:
+                name: list
+                type_args:
+                  - name: orderItem
+                    type_args: []
+                    union_members: []
+                    intersection_members: []
+                    span:
+                      start: 696
+                      end: 705
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 691
+                  end: 706
+              default: ~
+              doc_comment: ~
+              span:
+                start: 685
+                end: 706
+            - name: payment_method
+              ty:
+                name: string
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 728
+                  end: 734
+              default: ~
+              doc_comment: ~
+              span:
+                start: 713
+                end: 734
+          outputs:
+            - name: order_id
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 763
+                  end: 770
+              default: ~
+              doc_comment: ~
+              span:
+                start: 754
+                end: 770
+            - name: status
+              ty:
+                name: orderStatus
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 784
+                  end: 795
+              default: ~
+              doc_comment: ~
+              span:
+                start: 777
+                end: 795
+          preconditions: []
+          postconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - status
+                    - start: 824
+                      end: 830
+                op: Eq
+                right:
+                  FieldAccess:
+                    object:
+                      Identifier:
+                        - orderStatus
+                        - start: 834
+                          end: 845
+                    field: Confirmed
+                    span:
+                      start: 834
+                      end: 855
+                span:
+                  start: 824
+                  end: 855
+          errors:
+            - name: EmptyCart
+              fields: []
+              span:
+                start: 1067
+                end: 1076
+            - name: InsufficientStock
+              fields: []
+              span:
+                start: 1085
+                end: 1102
+            - name: PaymentFailed
+              fields: []
+              span:
+                start: 1111
+                end: 1124
+          constraints: []
+          tests:
+            - kind:
+                Scenario:
+                  name: Successful order
+                  given:
+                    - Call:
+                        function: valid_customer
+                        type_args: ~
+                        args: []
+                        span:
+                          start: 919
+                          end: 935
+                  when: []
+                  expect:
+                    - BinaryOp:
+                        left:
+                          Identifier:
+                            - status
+                            - start: 952
+                              end: 958
+                        op: Eq
+                        right:
+                          FieldAccess:
+                            object:
+                              Identifier:
+                                - orderStatus
+                                - start: 962
+                                  end: 973
+                            field: Confirmed
+                            span:
+                              start: 962
+                              end: 983
+                        span:
+                          start: 952
+                          end: 983
+                  expect_error: ~
+              span:
+                start: 875
+                end: 990
+            - kind:
+                Scenario:
+                  name: Empty cart
+                  given: []
+                  when: []
+                  expect: []
+                  expect_error: EmptyCart
+              span:
+                start: 992
+                end: 1051
+          doc_comment: ~
+          span:
+            start: 621
+            end: 1128
+        - name: CancelOrder
+          inputs:
+            - name: order_id
+              ty:
+                name: orderId
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1177
+                  end: 1184
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1168
+                end: 1184
+          outputs:
+            - name: status
+              ty:
+                name: orderStatus
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1211
+                  end: 1222
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1204
+                end: 1222
+          preconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - status
+                    - start: 1250
+                      end: 1256
+                op: NotEq
+                right:
+                  FieldAccess:
+                    object:
+                      Identifier:
+                        - orderStatus
+                        - start: 1260
+                          end: 1271
+                    field: Cancelled
+                    span:
+                      start: 1260
+                      end: 1281
+                span:
+                  start: 1250
+                  end: 1281
+          postconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - status
+                    - start: 1310
+                      end: 1316
+                op: Eq
+                right:
+                  FieldAccess:
+                    object:
+                      Identifier:
+                        - orderStatus
+                        - start: 1320
+                          end: 1331
+                    field: Cancelled
+                    span:
+                      start: 1320
+                      end: 1341
+                span:
+                  start: 1310
+                  end: 1341
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: ~
+          span:
+            start: 1128
+            end: 1342
+      budget: ~
+      metrics:
+        - name: payment_attempts_total
+          kind: Counter
+          description: Total payment attempts
+          labels:
+            - payment_method
+            - status
+          buckets: ~
+          span:
+            start: 502
+            end: 621
+      invariants: []
+      applies: []
+      visibility: Public
+      doc_comment: ~
+      span:
+        start: 351
+        end: 1342

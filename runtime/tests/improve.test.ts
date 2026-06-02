@@ -1,6 +1,6 @@
 import * as fs from "fs";
 import * as path from "path";
-import { StrategyABTester, AgentOptimizer, TraceLog, RetryRecord } from "../src/improve";
+import { StrategyABTester, AgentOptimizer, TraceLog, RetryRecord, classifyFailure } from "../src/improve";
 
 describe("StrategyABTester", () => {
   const originalEnv = process.env;
@@ -124,5 +124,51 @@ describe("AgentOptimizer", () => {
     // Test metric errors
     inst = optimizer.getOptimizedInstructions("Test", ["metric or counter error"]);
     expect(inst).toContain("Correctly initialize and increment all required metrics");
+  });
+
+  test("should summarize traces by outcome, attempts, and category", () => {
+    const optimizer = new AgentOptimizer(testCacheDir);
+    optimizer.logTrace({
+      serviceName: "A",
+      timestamp: "t",
+      target: "typescript",
+      systemPrompt: "",
+      userPrompt: "",
+      response: "",
+      success: true,
+      attempts: 1,
+      errors: [],
+    });
+    optimizer.logTrace({
+      serviceName: "B",
+      timestamp: "t",
+      target: "typescript",
+      systemPrompt: "",
+      userPrompt: "",
+      response: "",
+      success: false,
+      attempts: 3,
+      errors: ["error TS2305: Cannot find name 'X'", "Contract coverage failed"],
+    });
+
+    const s = optimizer.summarizeTraces();
+    expect(s.totalTraces).toBe(2);
+    expect(s.succeeded).toBe(1);
+    expect(s.failed).toBe(1);
+    expect(s.retriedServices).toBe(1);
+    expect(s.byCategory.import).toBe(1);
+    expect(s.byCategory.contract).toBe(1);
+  });
+});
+
+describe("classifyFailure", () => {
+  test("classifies diagnostics deterministically into categories", () => {
+    expect(classifyFailure("Contract coverage failed: 2 uncovered")).toBe("contract");
+    expect(classifyFailure("Module '../types' has no exported member 'X'")).toBe("import");
+    expect(classifyFailure("error TS2322: Type 'string' is not assignable")).toBe("type");
+    expect(classifyFailure("expect(received).toBe(expected)")).toBe("test");
+    expect(classifyFailure("Unexpected token — syntax error")).toBe("syntax");
+    expect(classifyFailure("operation timed out")).toBe("timeout");
+    expect(classifyFailure("mystery failure")).toBe("unknown");
   });
 });

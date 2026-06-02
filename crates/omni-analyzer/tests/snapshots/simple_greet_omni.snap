@@ -1,0 +1,15 @@
+---
+source: crates/omni-analyzer/tests/conformance.rs
+expression: report
+---
+diagnostics:
+  - "warning[E0301]: service 'greetService' has no constraints — consider adding latency, reliability, or security constraints"
+  - "info[E0307]: operation 'greetService.Greet' has no test scenarios — consider adding tests for verification"
+  - "warning[E0903]: Logical Gap Detector: Operation 'Greet' in service 'greetService' has no postconditions defined. The output states are unconstrained."
+ir:
+  module_path: acme.greet
+  types: []
+  services:
+    - greetService
+  build_order:
+    - greetService

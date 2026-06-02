@@ -12,6 +12,7 @@ pub fn analyze_gaps(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                     if entropy_score < 3.0 {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Info,
+                            code: "E0901",
                             message: format!(
                                 "Intent Entropy Analysis: Goal for service '{}' has low clarity (entropy: {:.2}). Consider detailing the intent.",
                                 s.name, entropy_score
@@ -26,6 +27,7 @@ pub fn analyze_gaps(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                     if op.preconditions.is_empty() {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Warning,
+                            code: "E0902",
                             message: format!(
                                 "Logical Gap Detector: Operation '{}' in service '{}' has no preconditions defined. Input parameters might not be validated.",
                                 op.name, s.name
@@ -36,6 +38,7 @@ pub fn analyze_gaps(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
                     if op.postconditions.is_empty() {
                         diagnostics.push(Diagnostic {
                             kind: DiagnosticKind::Warning,
+                            code: "E0903",
                             message: format!(
                                 "Logical Gap Detector: Operation '{}' in service '{}' has no postconditions defined. The output states are unconstrained.",
                                 op.name, s.name
@@ -48,6 +51,7 @@ pub fn analyze_gaps(file: &SourceFile, diagnostics: &mut Vec<Diagnostic>) {
             Declaration::Component(c) if c.constraints.is_empty() => {
                 diagnostics.push(Diagnostic {
                     kind: DiagnosticKind::Warning,
+                    code: "E0904",
                     message: format!(
                         "Logical Gap Detector: Component '{}' has no layout/accessibility constraints configured.",
                         c.name

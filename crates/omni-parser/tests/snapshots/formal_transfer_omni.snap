@@ -1,0 +1,229 @@
+---
+source: crates/omni-parser/tests/conformance.rs
+expression: file
+---
+module:
+  path:
+    - demo
+    - formal
+  span:
+    start: 0
+    end: 18
+imports: []
+exports: []
+declarations:
+  - Service:
+      name: transferService
+      goal: Move money between accounts with machine-proven safety bounds
+      target: ~
+      constraints:
+        - name: formal_verification
+          args: []
+          span:
+            start: 407
+            end: 426
+      depends_on: []
+      dependencies: []
+      policies: []
+      operations:
+        - name: Withdraw
+          inputs:
+            - name: balance
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 628
+                  end: 633
+              default: ~
+              doc_comment: ~
+              span:
+                start: 620
+                end: 633
+            - name: amount
+              ty:
+                name: money
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 647
+                  end: 652
+              default: ~
+              doc_comment: ~
+              span:
+                start: 640
+                end: 652
+          outputs:
+            - name: success
+              ty:
+                name: bool
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 680
+                  end: 684
+              default: ~
+              doc_comment: ~
+              span:
+                start: 672
+                end: 684
+          preconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - amount
+                    - start: 712
+                      end: 718
+                op: Gt
+                right:
+                  Literal:
+                    Int: 0
+                span:
+                  start: 712
+                  end: 722
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - balance
+                    - start: 731
+                      end: 738
+                op: GtEq
+                right:
+                  Identifier:
+                    - amount
+                    - start: 742
+                      end: 748
+                span:
+                  start: 731
+                  end: 748
+          postconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - balance
+                    - start: 777
+                      end: 784
+                op: GtEq
+                right:
+                  Literal:
+                    Int: 0
+                span:
+                  start: 777
+                  end: 789
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: "Withdraws an amount; Z3 proves the balance can never go negative\ngiven the preconditions (balance >= amount && amount > 0 ⇒ balance >= 0)."
+          span:
+            start: 583
+            end: 793
+        - name: Reserve
+          inputs:
+            - name: stock
+              ty:
+                name: int
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 979
+                  end: 982
+              default: ~
+              doc_comment: ~
+              span:
+                start: 973
+                end: 982
+            - name: quantity
+              ty:
+                name: int
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 998
+                  end: 1001
+              default: ~
+              doc_comment: ~
+              span:
+                start: 989
+                end: 1001
+          outputs:
+            - name: success
+              ty:
+                name: bool
+                type_args: []
+                union_members: []
+                intersection_members: []
+                span:
+                  start: 1029
+                  end: 1033
+              default: ~
+              doc_comment: ~
+              span:
+                start: 1021
+                end: 1033
+          preconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - quantity
+                    - start: 1061
+                      end: 1069
+                op: Gt
+                right:
+                  Literal:
+                    Int: 0
+                span:
+                  start: 1061
+                  end: 1073
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - stock
+                    - start: 1082
+                      end: 1087
+                op: GtEq
+                right:
+                  Identifier:
+                    - quantity
+                    - start: 1091
+                      end: 1099
+                span:
+                  start: 1082
+                  end: 1099
+            - Literal:
+                String: Reservation must be confirmed within the checkout session
+          postconditions:
+            - BinaryOp:
+                left:
+                  Identifier:
+                    - stock
+                    - start: 1196
+                      end: 1201
+                op: GtEq
+                right:
+                  Literal:
+                    Int: 0
+                span:
+                  start: 1196
+                  end: 1206
+          errors: []
+          constraints: []
+          tests: []
+          doc_comment: "Reserves inventory; the formal bound is proven, the business rule\nstays natural-language and is covered by generated tests instead."
+          span:
+            start: 937
+            end: 1207
+      budget: ~
+      metrics: []
+      invariants: []
+      applies: []
+      visibility: Public
+      doc_comment: "Demonstrates machine-checked contracts: the `formal_verification`\nconstraint opts every operation's formal pre/postconditions into Z3\nproof obligations. Run `omni check examples/formal_transfer.omni` —\nproof certificates land in `.omni-cache/proofs/`."
+      span:
+        start: 290
+        end: 1207

@@ -32,8 +32,8 @@ OmniLang is not another programming language. It is a **verification-first speci
 ## Quick Example
 
 ```omnilang
-service checkout {
-  goal: "Process payment in <200ms at p95"
+service checkout
+  goal "Process payment in <200ms at p95"
 
   constraints:
     - idempotent
@@ -41,11 +41,11 @@ service checkout {
     - no_plaintext_cards
 
   inputs:
-    order_id: uuid
-    payment_token: token
+    order_id uuid
+    payment_token token
 
   outputs:
-    status: paymentStatus
+    status paymentStatus
 
   budget:
     max_generation_cost: $0.10
@@ -62,7 +62,6 @@ service checkout {
   evidence:
     - @traces/checkout_production_sample.json
     - @screenshots/checkout_flow_golden.png
-}
 ```
 
 ---

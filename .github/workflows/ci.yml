@@ -34,6 +34,12 @@ jobs:
       - name: Run tests
         run: cargo test --workspace
 
+      # The exporter tests regenerate runtime/src/types.ts and ir.schema.json from
+      # the Rust IR types on every `cargo test` run. If the committed files no
+      # longer match, the Rust IR and the TypeScript runtime have drifted apart.
+      - name: Verify generated TypeScript types and IR schema are up to date
+        run: git diff --exit-code runtime/src/types.ts runtime/src/ir.schema.json
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -50,10 +56,27 @@ jobs:
       - name: Run Runtime tests with coverage
         run: npm test --prefix runtime -- --coverage
 
+      - name: Set up Go (multi-target conformance)
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+
+      - name: Install Python test deps (multi-target conformance)
+        run: python3 -m pip install --quiet pytest
+
       - name: Run mock E2E build verification
         run: |
           OMNI_MOCK_LLM=true cargo run --bin omni -- build examples/stabilization_test.schema.omni --target typescript
           OMNI_MOCK_LLM=true cargo run --bin omni -- build examples/hybrid_billing.omni --target typescript
+
+      # Multi-target parity: the same spec must build + verify on all four targets.
+      - name: Run multi-target conformance matrix (mock LLM)
+        run: |
+          for target in typescript rust python go; do
+            echo "::group::hybrid_billing -> $target"
+            OMNI_MOCK_LLM=true cargo run --bin omni -- build examples/hybrid_billing.omni --target "$target"
+            echo "::endgroup::"
+          done
 
       - name: Run E2E Integration Test with Real LLM (Conditional)
         if: ${{ secrets.ANTHROPIC_API_KEY != '' }}

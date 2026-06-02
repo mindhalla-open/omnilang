@@ -1,0 +1,2877 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SpecIR",
+  "description": "Validated Specification IR — the output of the analysis phase. This is consumed by the orchestrator/codegen pipeline.",
+  "type": "object",
+  "required": [
+    "build_order",
+    "ir_version",
+    "module_path",
+    "services",
+    "source_file",
+    "stats",
+    "type_mappings",
+    "types"
+  ],
+  "properties": {
+    "build_order": {
+      "description": "Build order (topologically sorted)",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "ir_version": {
+      "description": "Schema version of this IR document. See [`CURRENT_IR_VERSION`].",
+      "type": "string"
+    },
+    "module_path": {
+      "description": "Module path: `[\"acme\", \"payments\", \"checkout\"]`",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "services": {
+      "description": "All service definitions",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ServiceDef"
+      }
+    },
+    "source_file": {
+      "description": "The parsed source file AST containing all declarations",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SourceFile"
+        }
+      ]
+    },
+    "stats": {
+      "description": "Summary statistics",
+      "allOf": [
+        {
+          "$ref": "#/definitions/SpecStats"
+        }
+      ]
+    },
+    "type_mappings": {
+      "description": "Type mappings for the default target (typescript)",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TypeMapping"
+      }
+    },
+    "types": {
+      "description": "All type definitions",
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/TypeDef"
+      }
+    }
+  },
+  "definitions": {
+    "ActionDecl": {
+      "type": "object",
+      "required": [
+        "inputs",
+        "name",
+        "outputs",
+        "postconditions",
+        "preconditions",
+        "span"
+      ],
+      "properties": {
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "postconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "AgentBoundary": {
+      "type": "object",
+      "required": [
+        "expr",
+        "kind",
+        "span"
+      ],
+      "properties": {
+        "expr": {
+          "$ref": "#/definitions/Expression"
+        },
+        "kind": {
+          "$ref": "#/definitions/BoundaryKind"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "AgentDecl": {
+      "type": "object",
+      "required": [
+        "boundaries",
+        "capabilities",
+        "model",
+        "name",
+        "span",
+        "tests",
+        "tools"
+      ],
+      "properties": {
+        "boundaries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentBoundary"
+          }
+        },
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BudgetBlock"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "capabilities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigEntry"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestBlock"
+          }
+        },
+        "tools": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/AgentTool"
+          }
+        }
+      }
+    },
+    "AgentTool": {
+      "type": "object",
+      "required": [
+        "inputs",
+        "name",
+        "outputs",
+        "span"
+      ],
+      "properties": {
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "BinaryOperator": {
+      "type": "string",
+      "enum": [
+        "Eq",
+        "NotEq",
+        "Lt",
+        "Gt",
+        "LtEq",
+        "GtEq",
+        "And",
+        "Or",
+        "In",
+        "NotIn",
+        "Range",
+        "RangeExc"
+      ]
+    },
+    "BoundaryKind": {
+      "type": "string",
+      "enum": [
+        "Must",
+        "Cannot"
+      ]
+    },
+    "BudgetBlock": {
+      "type": "object",
+      "required": [
+        "entries",
+        "span"
+      ],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/BudgetEntry"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "BudgetEntry": {
+      "type": "object",
+      "required": [
+        "key",
+        "span",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "value": {
+          "$ref": "#/definitions/Expression"
+        }
+      }
+    },
+    "ComponentDecl": {
+      "type": "object",
+      "required": [
+        "constraints",
+        "events",
+        "name",
+        "props",
+        "slots",
+        "span",
+        "state",
+        "tests",
+        "visual_spec"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EventDecl"
+          }
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "props": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "slots": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "state": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "style_guide": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestBlock"
+          }
+        },
+        "visual_spec": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "ConfigEntry": {
+      "type": "object",
+      "required": [
+        "key",
+        "span",
+        "value"
+      ],
+      "properties": {
+        "key": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "value": {
+          "$ref": "#/definitions/Expression"
+        }
+      }
+    },
+    "Constraint": {
+      "type": "object",
+      "required": [
+        "args",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConstraintArg"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "ConstraintArg": {
+      "type": "object",
+      "required": [
+        "span",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "value": {
+          "$ref": "#/definitions/Expression"
+        }
+      }
+    },
+    "ConstraintDecl": {
+      "type": "object",
+      "required": [
+        "name",
+        "requires",
+        "span",
+        "verification"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "requires": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "verification": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/VerificationEntry"
+          }
+        }
+      }
+    },
+    "Declaration": {
+      "description": "A top-level declaration.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Type"
+          ],
+          "properties": {
+            "Type": {
+              "$ref": "#/definitions/TypeDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Service"
+          ],
+          "properties": {
+            "Service": {
+              "$ref": "#/definitions/ServiceDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Component"
+          ],
+          "properties": {
+            "Component": {
+              "$ref": "#/definitions/ComponentDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Pipeline"
+          ],
+          "properties": {
+            "Pipeline": {
+              "$ref": "#/definitions/PipelineDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Workflow"
+          ],
+          "properties": {
+            "Workflow": {
+              "$ref": "#/definitions/WorkflowDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Agent"
+          ],
+          "properties": {
+            "Agent": {
+              "$ref": "#/definitions/AgentDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Schema"
+          ],
+          "properties": {
+            "Schema": {
+              "$ref": "#/definitions/SchemaDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Policy"
+          ],
+          "properties": {
+            "Policy": {
+              "$ref": "#/definitions/PolicyDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Constraint"
+          ],
+          "properties": {
+            "Constraint": {
+              "$ref": "#/definitions/ConstraintDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Mixin"
+          ],
+          "properties": {
+            "Mixin": {
+              "$ref": "#/definitions/MixinDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "TargetDependencies"
+          ],
+          "properties": {
+            "TargetDependencies": {
+              "$ref": "#/definitions/TargetDependenciesDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Entity"
+          ],
+          "properties": {
+            "Entity": {
+              "$ref": "#/definitions/EntityDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Action"
+          ],
+          "properties": {
+            "Action": {
+              "$ref": "#/definitions/ActionDecl"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Rule"
+          ],
+          "properties": {
+            "Rule": {
+              "$ref": "#/definitions/RuleDecl"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Decorator": {
+      "type": "object",
+      "required": [
+        "args",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "DependencyPackage": {
+      "type": "object",
+      "required": [
+        "name",
+        "span",
+        "version"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "version": {
+          "type": "string"
+        }
+      }
+    },
+    "DependencyRef": {
+      "type": "object",
+      "required": [
+        "name",
+        "span"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "notes": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "EntityDecl": {
+      "type": "object",
+      "required": [
+        "fields",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EntityField"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "EntityField": {
+      "type": "object",
+      "required": [
+        "decorators",
+        "name",
+        "span",
+        "ty"
+      ],
+      "properties": {
+        "decorators": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Decorator"
+          }
+        },
+        "default": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expression"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "ty": {
+          "$ref": "#/definitions/TypeRef"
+        }
+      }
+    },
+    "EnumType": {
+      "type": "object",
+      "required": [
+        "span",
+        "variants"
+      ],
+      "properties": {
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "variants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EnumVariant"
+          }
+        }
+      }
+    },
+    "EnumVariant": {
+      "type": "object",
+      "required": [
+        "fields",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "fields": {
+          "description": "Optional associated data: `Shipped(tracking_id: String)`",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "ErrorDecl": {
+      "type": "object",
+      "required": [
+        "fields",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "EventDecl": {
+      "type": "object",
+      "required": [
+        "name",
+        "params",
+        "span"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "Expression": {
+      "description": "Expressions used in constraints, pre/postconditions, and test assertions.",
+      "oneOf": [
+        {
+          "description": "A literal value: `42`, `\"hello\"`, `true`, `200ms`, `$0.10`",
+          "type": "object",
+          "required": [
+            "Literal"
+          ],
+          "properties": {
+            "Literal": {
+              "$ref": "#/definitions/Literal"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "An identifier: `order_id`, `PaymentStatus`",
+          "type": "object",
+          "required": [
+            "Identifier"
+          ],
+          "properties": {
+            "Identifier": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/Span"
+                }
+              ],
+              "maxItems": 2,
+              "minItems": 2
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Binary operation: `a == b`, `balance > 0`",
+          "type": "object",
+          "required": [
+            "BinaryOp"
+          ],
+          "properties": {
+            "BinaryOp": {
+              "type": "object",
+              "required": [
+                "left",
+                "op",
+                "right",
+                "span"
+              ],
+              "properties": {
+                "left": {
+                  "$ref": "#/definitions/Expression"
+                },
+                "op": {
+                  "$ref": "#/definitions/BinaryOperator"
+                },
+                "right": {
+                  "$ref": "#/definitions/Expression"
+                },
+                "span": {
+                  "$ref": "#/definitions/Span"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Unary operation: `!deleted`",
+          "type": "object",
+          "required": [
+            "UnaryOp"
+          ],
+          "properties": {
+            "UnaryOp": {
+              "type": "object",
+              "required": [
+                "op",
+                "operand",
+                "span"
+              ],
+              "properties": {
+                "op": {
+                  "$ref": "#/definitions/UnaryOperator"
+                },
+                "operand": {
+                  "$ref": "#/definitions/Expression"
+                },
+                "span": {
+                  "$ref": "#/definitions/Span"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Function call: `old(balance)`, `sum(items)`",
+          "type": "object",
+          "required": [
+            "Call"
+          ],
+          "properties": {
+            "Call": {
+              "type": "object",
+              "required": [
+                "args",
+                "function",
+                "span"
+              ],
+              "properties": {
+                "args": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                },
+                "function": {
+                  "type": "string"
+                },
+                "span": {
+                  "$ref": "#/definitions/Span"
+                },
+                "type_args": {
+                  "type": [
+                    "array",
+                    "null"
+                  ],
+                  "items": {
+                    "$ref": "#/definitions/TypeRef"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "Field access: `order.status`",
+          "type": "object",
+          "required": [
+            "FieldAccess"
+          ],
+          "properties": {
+            "FieldAccess": {
+              "type": "object",
+              "required": [
+                "field",
+                "object",
+                "span"
+              ],
+              "properties": {
+                "field": {
+                  "type": "string"
+                },
+                "object": {
+                  "$ref": "#/definitions/Expression"
+                },
+                "span": {
+                  "$ref": "#/definitions/Span"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "List literal: `[1, 2, 3]`",
+          "type": "object",
+          "required": [
+            "List"
+          ],
+          "properties": {
+            "List": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                },
+                {
+                  "$ref": "#/definitions/Span"
+                }
+              ],
+              "maxItems": 2,
+              "minItems": 2
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "Field": {
+      "type": "object",
+      "required": [
+        "name",
+        "span",
+        "ty"
+      ],
+      "properties": {
+        "default": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expression"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "ty": {
+          "$ref": "#/definitions/TypeRef"
+        }
+      }
+    },
+    "GeneratorConfig": {
+      "description": "Configuration for generating constraint-aware arbitrary values. Extracted from refined type constraints to drive property-based test generators.",
+      "type": "object",
+      "properties": {
+        "format_pattern": {
+          "description": "Format pattern (from `format: regex(...)` or `format: \"...\"`)",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "max": {
+          "description": "Maximum value for numeric ranges (from `range: [min, max]`)",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "max_length": {
+          "description": "Maximum string length (from `max_length`)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "min": {
+          "description": "Minimum value for numeric ranges (from `range: [min, max]`)",
+          "type": [
+            "number",
+            "null"
+          ],
+          "format": "double"
+        },
+        "min_length": {
+          "description": "Minimum string length (from `min_length`)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "precision": {
+          "description": "Decimal precision digits (from `precision`)",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "ImportDecl": {
+      "description": "Import declaration: `use std.http.{Request, Response}`",
+      "type": "object",
+      "required": [
+        "items",
+        "kind",
+        "path",
+        "span"
+      ],
+      "properties": {
+        "items": {
+          "description": "Specific items to import, or empty for wildcard `*`.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ImportItems"
+            }
+          ]
+        },
+        "kind": {
+          "description": "Import kind: standard, relative, or registry.",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ImportKind"
+            }
+          ]
+        },
+        "path": {
+          "description": "The import path segments.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "ImportItem": {
+      "type": "object",
+      "required": [
+        "name",
+        "span"
+      ],
+      "properties": {
+        "alias": {
+          "description": "Optional alias: `use std.money.Money as Currency`",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "ImportItems": {
+      "oneOf": [
+        {
+          "description": "`use std.auth.*`",
+          "type": "string",
+          "enum": [
+            "Wildcard"
+          ]
+        },
+        {
+          "description": "`use std.http.{Request, Response}`",
+          "type": "object",
+          "required": [
+            "Named"
+          ],
+          "properties": {
+            "Named": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/ImportItem"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ImportKind": {
+      "description": "The kind of import path.",
+      "oneOf": [
+        {
+          "description": "Standard dotted path: `use std.http.Request`",
+          "type": "string",
+          "enum": [
+            "Standard"
+          ]
+        },
+        {
+          "description": "Relative path: `use ./shared/types.*`",
+          "type": "string",
+          "enum": [
+            "Relative"
+          ]
+        },
+        {
+          "description": "Registry import: `use registry://acme/shared@2.0.*`",
+          "type": "object",
+          "required": [
+            "Registry"
+          ],
+          "properties": {
+            "Registry": {
+              "type": "object",
+              "required": [
+                "registry"
+              ],
+              "properties": {
+                "registry": {
+                  "type": "string"
+                },
+                "version": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "IndexDecl": {
+      "type": "object",
+      "required": [
+        "entity",
+        "fields",
+        "span"
+      ],
+      "properties": {
+        "entity": {
+          "type": "string"
+        },
+        "fields": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "where": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expression"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      }
+    },
+    "Literal": {
+      "oneOf": [
+        {
+          "type": "string",
+          "enum": [
+            "Null"
+          ]
+        },
+        {
+          "type": "object",
+          "required": [
+            "Int"
+          ],
+          "properties": {
+            "Int": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Float"
+          ],
+          "properties": {
+            "Float": {
+              "type": "number",
+              "format": "double"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "String"
+          ],
+          "properties": {
+            "String": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Bool"
+          ],
+          "properties": {
+            "Bool": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Duration"
+          ],
+          "properties": {
+            "Duration": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Money"
+          ],
+          "properties": {
+            "Money": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "MetricDecl": {
+      "type": "object",
+      "required": [
+        "kind",
+        "labels",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "buckets": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/MetricKind"
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "MetricKind": {
+      "type": "string",
+      "enum": [
+        "Counter",
+        "Gauge",
+        "Histogram"
+      ]
+    },
+    "MixinDecl": {
+      "description": "A reusable mixin block.",
+      "type": "object",
+      "required": [
+        "constraints",
+        "name",
+        "postconditions",
+        "span",
+        "tests",
+        "visibility"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "postconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestBlock"
+          }
+        },
+        "visibility": {
+          "$ref": "#/definitions/Visibility"
+        }
+      }
+    },
+    "ModuleDecl": {
+      "description": "Module declaration: `module acme.payments.checkout`",
+      "type": "object",
+      "required": [
+        "path",
+        "span"
+      ],
+      "properties": {
+        "path": {
+          "description": "Dotted module path, e.g. `[\"acme\", \"payments\", \"checkout\"]`.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "OperationDecl": {
+      "type": "object",
+      "required": [
+        "constraints",
+        "errors",
+        "inputs",
+        "name",
+        "outputs",
+        "postconditions",
+        "preconditions",
+        "span",
+        "tests"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "errors": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ErrorDecl"
+          }
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "postconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "preconditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestBlock"
+          }
+        }
+      }
+    },
+    "PipelineDecl": {
+      "type": "object",
+      "required": [
+        "constraints",
+        "name",
+        "sink",
+        "source",
+        "span",
+        "stages",
+        "tests"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "schedule": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sink": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigEntry"
+          }
+        },
+        "source": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigEntry"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "stages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PipelineStage"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestBlock"
+          }
+        }
+      }
+    },
+    "PipelineStage": {
+      "type": "object",
+      "required": [
+        "entries",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigEntry"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "PolicyClause": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Simple"
+          ],
+          "properties": {
+            "Simple": {
+              "type": "array",
+              "items": [
+                {
+                  "type": "string"
+                },
+                {
+                  "$ref": "#/definitions/Span"
+                }
+              ],
+              "maxItems": 2,
+              "minItems": 2
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Action"
+          ],
+          "properties": {
+            "Action": {
+              "type": "object",
+              "required": [
+                "span",
+                "value",
+                "verb"
+              ],
+              "properties": {
+                "span": {
+                  "$ref": "#/definitions/Span"
+                },
+                "value": {
+                  "$ref": "#/definitions/Expression"
+                },
+                "verb": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "PolicyDecl": {
+      "type": "object",
+      "required": [
+        "name",
+        "rules",
+        "span"
+      ],
+      "properties": {
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyRule"
+          }
+        },
+        "scope": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "PolicyRule": {
+      "type": "object",
+      "required": [
+        "clauses",
+        "condition",
+        "span"
+      ],
+      "properties": {
+        "clauses": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/PolicyClause"
+          }
+        },
+        "condition": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "Quantifier": {
+      "type": "object",
+      "required": [
+        "generator",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "generator": {
+          "$ref": "#/definitions/Expression"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "RefinedType": {
+      "type": "object",
+      "required": [
+        "constraints",
+        "span"
+      ],
+      "properties": {
+        "base": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TypeRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TypeConstraint"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "RelationDecl": {
+      "type": "object",
+      "required": [
+        "args",
+        "lhs",
+        "rel_type",
+        "rhs",
+        "span"
+      ],
+      "properties": {
+        "args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigEntry"
+          }
+        },
+        "lhs": {
+          "type": "string"
+        },
+        "rel_type": {
+          "type": "string"
+        },
+        "rhs": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "RuleDecl": {
+      "type": "object",
+      "required": [
+        "condition",
+        "name",
+        "span",
+        "target"
+      ],
+      "properties": {
+        "condition": {
+          "$ref": "#/definitions/Expression"
+        },
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    },
+    "SchemaDecl": {
+      "type": "object",
+      "required": [
+        "constraints",
+        "entities",
+        "indexes",
+        "name",
+        "relations",
+        "span"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "entities": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EntityDecl"
+          }
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "indexes": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/IndexDecl"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "relations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/RelationDecl"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "ServiceDecl": {
+      "type": "object",
+      "required": [
+        "applies",
+        "constraints",
+        "dependencies",
+        "depends_on",
+        "invariants",
+        "metrics",
+        "name",
+        "operations",
+        "policies",
+        "span",
+        "visibility"
+      ],
+      "properties": {
+        "applies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "budget": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/BudgetBlock"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DependencyRef"
+          }
+        },
+        "depends_on": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "metrics": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MetricDecl"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "operations": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/OperationDecl"
+          }
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ServicePolicy"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "target": {
+          "description": "Per-service target language override (`target rust`). `None` = use the build-wide target.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "visibility": {
+          "$ref": "#/definitions/Visibility"
+        }
+      }
+    },
+    "ServiceDef": {
+      "type": "object",
+      "required": [
+        "confidence",
+        "constraint_count",
+        "constraint_names",
+        "dependency_count",
+        "evidence",
+        "metric_count",
+        "metric_names",
+        "name",
+        "operation_count",
+        "operation_names",
+        "test_count"
+      ],
+      "properties": {
+        "confidence": {
+          "$ref": "#/definitions/TrustLevel"
+        },
+        "constraint_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "constraint_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "dependency_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "evidence": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "metric_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "metric_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "operation_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "operation_names": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "target": {
+          "description": "Per-service target language override; `None` = build-wide target.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "test_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "ServicePolicy": {
+      "type": "object",
+      "required": [
+        "entries",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ConfigEntry"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "SourceFile": {
+      "description": "A complete OmniLang source file.",
+      "type": "object",
+      "required": [
+        "declarations",
+        "exports",
+        "imports",
+        "module"
+      ],
+      "properties": {
+        "declarations": {
+          "description": "Top-level declarations.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Declaration"
+          }
+        },
+        "exports": {
+          "description": "Exported symbol names (from `export` declarations).",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "imports": {
+          "description": "Import statements.",
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ImportDecl"
+          }
+        },
+        "module": {
+          "description": "Module declaration (required, first statement).",
+          "allOf": [
+            {
+              "$ref": "#/definitions/ModuleDecl"
+            }
+          ]
+        }
+      }
+    },
+    "Span": {
+      "description": "A byte-offset span in source code, used for error reporting.",
+      "type": "object",
+      "required": [
+        "end",
+        "start"
+      ],
+      "properties": {
+        "end": {
+          "description": "Byte offset of the end (exclusive).",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "start": {
+          "description": "Byte offset of the start (inclusive).",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "SpecStats": {
+      "type": "object",
+      "required": [
+        "agent_count",
+        "component_count",
+        "constraint_count",
+        "metric_count",
+        "operation_count",
+        "pipeline_count",
+        "policy_count",
+        "schema_count",
+        "service_count",
+        "test_count",
+        "type_count",
+        "workflow_count"
+      ],
+      "properties": {
+        "agent_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "component_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "constraint_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "metric_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "operation_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "pipeline_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "policy_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "schema_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "service_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "test_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "type_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "workflow_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        }
+      }
+    },
+    "StructType": {
+      "type": "object",
+      "required": [
+        "fields",
+        "span"
+      ],
+      "properties": {
+        "fields": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Field"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "TargetDependenciesDecl": {
+      "type": "object",
+      "required": [
+        "entries",
+        "span"
+      ],
+      "properties": {
+        "entries": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TargetDependencyEntry"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "TargetDependencyEntry": {
+      "type": "object",
+      "required": [
+        "packages",
+        "span",
+        "target"
+      ],
+      "properties": {
+        "packages": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DependencyPackage"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "target": {
+          "type": "string"
+        }
+      }
+    },
+    "TestBlock": {
+      "type": "object",
+      "required": [
+        "kind",
+        "span"
+      ],
+      "properties": {
+        "kind": {
+          "$ref": "#/definitions/TestKind"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "TestKind": {
+      "oneOf": [
+        {
+          "type": "object",
+          "required": [
+            "Scenario"
+          ],
+          "properties": {
+            "Scenario": {
+              "type": "object",
+              "required": [
+                "expect",
+                "given",
+                "name",
+                "when"
+              ],
+              "properties": {
+                "expect": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                },
+                "expect_error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "given": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                },
+                "name": {
+                  "type": "string"
+                },
+                "when": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": [
+            "Property"
+          ],
+          "properties": {
+            "Property": {
+              "type": "object",
+              "required": [
+                "assert",
+                "given",
+                "name",
+                "quantifiers",
+                "when"
+              ],
+              "properties": {
+                "assert": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                },
+                "given": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                },
+                "name": {
+                  "type": "string"
+                },
+                "quantifiers": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Quantifier"
+                  }
+                },
+                "when": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/definitions/Expression"
+                  }
+                }
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TrustLevel": {
+      "type": "string",
+      "enum": [
+        "Speculative",
+        "Low",
+        "Medium",
+        "High",
+        "Proven"
+      ]
+    },
+    "TypeConstraint": {
+      "type": "object",
+      "required": [
+        "name",
+        "span",
+        "value"
+      ],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "value": {
+          "$ref": "#/definitions/Expression"
+        }
+      }
+    },
+    "TypeDecl": {
+      "type": "object",
+      "required": [
+        "kind",
+        "name",
+        "span",
+        "type_params",
+        "visibility"
+      ],
+      "properties": {
+        "doc_comment": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "kind": {
+          "$ref": "#/definitions/TypeKind"
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "type_params": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TypeParam"
+          }
+        },
+        "visibility": {
+          "$ref": "#/definitions/Visibility"
+        }
+      }
+    },
+    "TypeDef": {
+      "type": "object",
+      "required": [
+        "field_count",
+        "kind",
+        "name"
+      ],
+      "properties": {
+        "field_count": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0.0
+        },
+        "generator": {
+          "description": "Generator configuration for property-based testing. Present only for refined types with constraints.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/GeneratorConfig"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        }
+      }
+    },
+    "TypeKind": {
+      "oneOf": [
+        {
+          "description": "`type OrderStatus = enum { Draft, Pending, ... }`",
+          "type": "object",
+          "required": [
+            "Enum"
+          ],
+          "properties": {
+            "Enum": {
+              "$ref": "#/definitions/EnumType"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "`type Customer = struct { id: CustomerId, ... }`",
+          "type": "object",
+          "required": [
+            "Struct"
+          ],
+          "properties": {
+            "Struct": {
+              "$ref": "#/definitions/StructType"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "`type OrderId = String { format: regex(\"...\") }`",
+          "type": "object",
+          "required": [
+            "Refined"
+          ],
+          "properties": {
+            "Refined": {
+              "$ref": "#/definitions/RefinedType"
+            }
+          },
+          "additionalProperties": false
+        },
+        {
+          "description": "`type UserId = UUID` (simple alias)",
+          "type": "object",
+          "required": [
+            "Alias"
+          ],
+          "properties": {
+            "Alias": {
+              "$ref": "#/definitions/TypeRef"
+            }
+          },
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TypeMapping": {
+      "description": "A type mapping entry from OmniLang to a target language type.",
+      "type": "object",
+      "required": [
+        "omni_type",
+        "target_type"
+      ],
+      "properties": {
+        "import_path": {
+          "description": "Optional import/use path required for this type",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "omni_type": {
+          "type": "string"
+        },
+        "target_type": {
+          "type": "string"
+        }
+      }
+    },
+    "TypeParam": {
+      "type": "object",
+      "required": [
+        "bounds",
+        "name",
+        "span"
+      ],
+      "properties": {
+        "bounds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TypeRef"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        }
+      }
+    },
+    "TypeRef": {
+      "description": "A reference to a type, e.g. `String`, `List<Order>`, `Option<Int>`.",
+      "type": "object",
+      "required": [
+        "intersection_members",
+        "name",
+        "span",
+        "type_args",
+        "union_members"
+      ],
+      "properties": {
+        "intersection_members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TypeRef"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "type_args": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TypeRef"
+          }
+        },
+        "union_members": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TypeRef"
+          }
+        }
+      }
+    },
+    "UnaryOperator": {
+      "type": "string",
+      "enum": [
+        "Not",
+        "Neg"
+      ]
+    },
+    "VerificationEntry": {
+      "type": "object",
+      "required": [
+        "evidence",
+        "span",
+        "tool"
+      ],
+      "properties": {
+        "evidence": {
+          "type": "string"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "tool": {
+          "type": "string"
+        }
+      }
+    },
+    "Visibility": {
+      "description": "Visibility of a declaration.",
+      "oneOf": [
+        {
+          "description": "Public (default) — visible to importing modules.",
+          "type": "string",
+          "enum": [
+            "Public"
+          ]
+        },
+        {
+          "description": "Private — only visible within the declaring module.",
+          "type": "string",
+          "enum": [
+            "Private"
+          ]
+        }
+      ]
+    },
+    "WorkflowDecl": {
+      "type": "object",
+      "required": [
+        "constraints",
+        "dependencies",
+        "invariants",
+        "name",
+        "policies",
+        "span",
+        "states",
+        "tests",
+        "transitions"
+      ],
+      "properties": {
+        "constraints": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Constraint"
+          }
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/DependencyRef"
+          }
+        },
+        "goal": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "invariants": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Expression"
+          }
+        },
+        "name": {
+          "type": "string"
+        },
+        "policies": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ServicePolicy"
+          }
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "states": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/TestBlock"
+          }
+        },
+        "transitions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/WorkflowTransition"
+          }
+        }
+      }
+    },
+    "WorkflowTimeout": {
+      "type": "object",
+      "required": [
+        "duration",
+        "span",
+        "target_state"
+      ],
+      "properties": {
+        "duration": {
+          "$ref": "#/definitions/Expression"
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "target_state": {
+          "type": "string"
+        }
+      }
+    },
+    "WorkflowTransition": {
+      "type": "object",
+      "required": [
+        "actions",
+        "from",
+        "span",
+        "to"
+      ],
+      "properties": {
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "from": {
+          "type": "string"
+        },
+        "guard": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/Expression"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "span": {
+          "$ref": "#/definitions/Span"
+        },
+        "timeout": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/WorkflowTimeout"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "to": {
+          "type": "string"
+        },
+        "trigger": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    }
+  }
+}
