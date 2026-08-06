@@ -16,4 +16,4 @@ omni-analyzer = { path = "../omni-analyzer" }
 clap = { version = "4", features = ["derive"] }
 colored = "3"
 serde_json = { workspace = true }
-toml = "0.8"
+toml = "1.1"
