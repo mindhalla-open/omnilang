@@ -11,7 +11,7 @@
     "playground": "node dist/playground/server.js & sleep 1 && open http://localhost:3000"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.32.0",
+    "@anthropic-ai/sdk": "^0.115.0",
     "ajv": "^8.20.0",
     "dotenv": "^16.4.5",
     "minimist": "^1.2.8",
