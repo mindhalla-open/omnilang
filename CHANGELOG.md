@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Gate-based development process** (ADR-0011): `scripts/gates/run-all.sh` runs
+  seven convention gates locally and in CI — workflow validity, example
+  check/format coverage, brace-free syntax canon, diagnostic-code documentation,
+  credential scanning, build-cost budgets, changelog. Registry and known gaps in
+  `docs/gates.md`; process in `docs/21-engineering-process.md`; working
+  agreements in `CLAUDE.md`.
+- `docs/adr/` with 11 decision records, including the nine backfilled from the
+  gitignored `tasks/README.md` decisions log.
+- Coverage floor for the runtime suite (`runtime/jest.config.js`) — `--coverage`
+  previously produced a number nothing enforced.
+- Dependency and advisory audits in CI (`npm audit`, `rustsec/audit-check`) and
+  weekly Dependabot updates for Cargo, npm and GitHub Actions.
+- `scripts/metrics/report.sh` — lead time, first-pass gate rate, incident proxy.
+- Epic contract issue template; PR template rewritten around risk zones.
+
 - **Z3 formal verification hardening**:
   - SMT sorts are now taken from the operation's declared `inputs`/`outputs` types (name-based heuristics are only a fallback; fixed `valid`-style names being typed `String` because they contain the substring `id`).
   - Counterexamples are extracted from the Z3 model and reported as concrete `var = value` bindings (e.g. `amount = 1.0, balance = 0.0`).
@@ -17,7 +32,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `formal_verification` and `proven` are now registered constraint names (no more `E0212: undefined constraint` when opting into proofs).
   - New example `examples/formal_transfer.omni` with two Z3-proven obligations and a deferred natural-language condition.
 
+### Changed
+
+- CI: explicit least-privilege `permissions:`, the hardcoded six-example
+  `omni check` list replaced by a glob over all eleven, and the non-functional
+  `cost-report` job (its `ls src/**/*.omni` guard never matched) replaced by an
+  enforcing budget gate.
+- `.github/issue_template/` renamed to `.github/ISSUE_TEMPLATE/`, the path
+  GitHub documents.
+
 ### Fixed
+
+- **CI had not run since 2026-05-26.** `.github/workflows/ci.yml` used
+  `if: ${{ secrets.ANTHROPIC_API_KEY != '' }}` on a step; the `secrets` context is
+  not available in `if:`, so GitHub rejected the workflow and failed every run in
+  0s with no jobs and no logs. PRs #5–#9 merged with no gate running. The
+  conditional now goes through `env:` and announces the skip, and
+  `scripts/gates/workflows.sh` fails the build if the pattern comes back.
+- `Cargo.lock` and `runtime/package-lock.json` are now tracked (ADR-0010). They
+  were gitignored, which meant `npm ci` could not have worked on a clean
+  checkout, `actions/setup-node`'s cache path pointed at a missing file, and the
+  Rust cache key `hashFiles('**/Cargo.lock')` hashed nothing. Builds now use
+  `--locked` / `npm ci`.
+- Resolved 4 high-severity advisories in the runtime dependency tree
+  (`npm audit fix`, no breaking upgrades; all 128 runtime tests still pass).
+- Documented `E0242` (unsupported service target) in `docs/18-error-codes.md` — it
+  was emitted but undocumented.
+- Converted the last brace-style block in `docs/04-syntax-reference.md` to the
+  canonical brace-free form (ADR-0009).
 
 - **Formal verification soundness**: natural-language conditions were asserted verbatim into SMT scripts (invalid SMT → spurious failures), operations with no formal postconditions ran `check-sat` on preconditions alone and reported the inevitable `sat` as a "counterexample", and out-of-subset operators (`in`, `..`) were silently translated as `=` — which could produce a false proof. All conditions are now filtered to the machine-checkable subset, untranslatable constructs are hard errors, and skipped natural-language conditions are reported as deferred to generated tests.
 

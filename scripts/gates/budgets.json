@@ -1,0 +1,17 @@
+{
+  "_note": "Per-example build-cost ceilings in USD, from `omni plan --format json` (estimated_cost_usd). Baselined 2026-08-06 at +10% headroom. A new example MUST be added here explicitly — that is the point: cost growth is a decision, not a side effect. Re-baseline in the same PR that changes a spec, and say why in the PR description.",
+  "total_usd": 0.7,
+  "examples": {
+    "examples/blocks.omni": 0.1452,
+    "examples/booking_flow.omni": 0.01,
+    "examples/checkout.omni": 0.0858,
+    "examples/formal_transfer.omni": 0.0759,
+    "examples/full_stack_ordering.omni": 0.0776,
+    "examples/hybrid_billing.omni": 0.0759,
+    "examples/self_correction.omni": 0.0792,
+    "examples/self_correction_demo.omni": 0.0743,
+    "examples/simple_greet.omni": 0.0743,
+    "examples/stabilization_test.schema.omni": 0.01,
+    "examples/support_agent.omni": 0.01
+  }
+}

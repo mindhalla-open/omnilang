@@ -51,25 +51,50 @@ crates/
 
 1. Fork the repository
 2. Create a feature branch: `git checkout -b feat/my-feature`
-3. Make your changes
+3. Make your changes, as a vertical slice — spec → analyzer → runtime → all four
+   targets → docs → example. A change that only lands on one target is unfinished.
 4. Add tests for new functionality
-5. Run `cargo test --workspace` to verify
-6. Run `cargo fmt --all` and `cargo clippy`
-7. Commit with [conventional commits](https://www.conventionalcommits.org/):
+5. Commit with [conventional commits](https://www.conventionalcommits.org/):
    - `feat: add enum type parsing`
    - `fix: handle unterminated strings in lexer`
    - `docs: update syntax reference`
    - `test: add snapshot tests for service blocks`
-8. Open a Pull Request
+6. Open a Pull Request
 
-## Pull Request Checklist
+## Before you push
 
-- [ ] Code compiles: `cargo build --workspace`
-- [ ] Tests pass: `cargo test --workspace`
-- [ ] No lint warnings: `cargo clippy -- -D warnings`
-- [ ] Code formatted: `cargo fmt --all -- --check`
-- [ ] New tests added for new functionality
-- [ ] Documentation updated if needed
+Two commands. Everything CI enforces is reproducible locally — if these are
+green, the pipeline should be too.
+
+```bash
+cargo fmt --all && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace
+./scripts/gates/run-all.sh
+```
+
+`run-all.sh` checks the conventions no compiler knows about: canonical brace-free
+syntax, every example analyzable and formatted, diagnostic codes documented,
+build-cost budgets, changelog, credentials, workflow validity. Each gate and the
+reason it exists are listed in [`docs/gates.md`](./docs/gates.md).
+
+**A red gate means the work is not done.** Fix the cause; never weaken a gate to
+get a green build.
+
+## Pull Requests
+
+The PR template does not ask you to confirm formatting, lints, tests, coverage
+or the changelog — those are gates, and a checkbox that duplicates a gate only
+teaches people to tick without reading. It asks for the things a machine cannot
+judge: whether the change stayed inside its boundaries, which invariants it
+touches, and what is irreversible about it.
+
+**Irreversible changes need an ADR first.** Syntax and grammar, the Spec IR,
+cache and lock formats, removing or renumbering a diagnostic code, removing a
+CLI flag, anything published — write `docs/adr/NNNN-title.md` before the
+implementation. See [`docs/adr/`](./docs/adr/README.md).
+
+The full process, and where it breaks, is in
+[`docs/21-engineering-process.md`](./docs/21-engineering-process.md). Working
+agreements for both humans and AI agents are in [`CLAUDE.md`](./CLAUDE.md).
 
 ## Reporting Issues
 

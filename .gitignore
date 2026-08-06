@@ -20,16 +20,18 @@ tasks/
 
 # === Node.js ===
 node_modules/
-package-lock.json
 yarn.lock
 pnpm-lock.yaml
 runtime/coverage/
 coverage/
-
+# runtime/package-lock.json is TRACKED on purpose: CI runs `npm ci`, which
+# refuses to run without it, and a floating dependency tree cannot produce
+# reproducible builds. See docs/adr/0010-commit-lockfiles.md.
 
 # === Rust ===
 target/
-Cargo.lock
+# Cargo.lock is TRACKED on purpose: this workspace ships binaries (omni,
+# omni-lsp) and promises reproducible builds. See docs/adr/0010-commit-lockfiles.md.
 
 # === Python ===
 __pycache__/

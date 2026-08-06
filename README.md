@@ -149,6 +149,17 @@ crates/
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for build instructions and contribution guidelines.
 
+Most of the code here is written by AI agents, so the conventions are executable
+rather than written down and hoped for: `./scripts/gates/run-all.sh` runs every
+one of them locally, and CI runs the same command.
+
+| Document | Description |
+|----------|-------------|
+| [Engineering Process](./docs/21-engineering-process.md) | Epic contracts, gates instead of rituals, what is measured |
+| [Gates](./docs/gates.md) | Every machine check, what it replaces, and the known gaps |
+| [Decision Records](./docs/adr/README.md) | Decisions with a long horizon |
+| [CLAUDE.md](./CLAUDE.md) | Working agreements for agents and humans |
+
 ## License
 
 Licensed under either of:

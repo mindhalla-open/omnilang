@@ -26,6 +26,19 @@ OmniLang is not another programming language. It is a **verification-first speci
 | [Ecosystem](./13-ecosystem.md) | Verification packages, MCP servers, training data, Spec Engineer role |
 | [Runtime Interpretation](./14-runtime-interpretation.md) | Live policy enforcement for production AI agents |
 | [Target Languages](./15-target-languages.md) | Why agents write Rust/Go/TS, not binary code |
+| [CI & Testing](./16-ci_testing.md) | Running OmniLang in a pipeline |
+| [Hybrid Approach](./17-hybrid_approach.md) | Infra config split out, natural-language invariants |
+| [Error Codes](./18-error-codes.md) | Every diagnostic code the analyzer can emit |
+| [Versioning Policy](./19-versioning-policy.md) | Compatibility guarantees for the language and the IR |
+| [Build Pipeline](./20-build-pipeline.md) | What `omni build` does, step by step |
+
+### How this project is built
+
+| Document | Description |
+|----------|-------------|
+| [Engineering Process](./21-engineering-process.md) | Epic contracts, gates instead of rituals, what is measured |
+| [Gates](./gates.md) | Every machine check, what it replaces, and the known gaps |
+| [Decision Records](./adr/README.md) | Decisions with a long horizon, and the ones that were reversed |
 
 ---
 

@@ -1,18 +1,42 @@
-## Description
-Please describe the changes in this PR and how they address the problem context.
+<!--
+Style, formatting, tests, changelog, coverage, examples, error-code docs and
+budgets are all machine-checked — see docs/gates.md. There is nothing to promise
+here about them: either the gates are green or the work is not done.
 
-## Related Issues
-Fixes # (issue number)
+What is left is what a machine cannot judge. Please answer only that.
+-->
 
-## Type of Change
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to not work as expected)
-- [ ] Refactoring / Documentation / Chore
+## Intent
 
-## Checklist
-- [ ] My code follows the code style and formatting of this project (`cargo fmt --all -- --check` passes).
-- [ ] I have run all clippy warnings checks locally and they pass cleanly (`cargo clippy --workspace --all-targets -- -D warnings`).
-- [ ] I have added/updated tests covering my changes, and all workspace tests pass (`cargo test --workspace`).
-- [ ] I have updated the `CHANGELOG.md` file with a version bump and feature descriptions.
-- [ ] I have updated relevant documentation in the `docs/` directory.
+What changes for the user, and why now. Link the epic or ADR.
+
+Closes #
+
+## Boundaries
+
+Did this stay inside the epic? Anything touched that was declared out of scope,
+and why.
+
+## Invariants
+
+Tick what applies, and say what you did about it.
+
+- [ ] **Syntax / grammar** — existing `.omni` source still parses and means the same
+- [ ] **Spec IR** — regenerated `types.ts` + `ir.schema.json`, version decided per `docs/19-versioning-policy.md`
+- [ ] **Diagnostic codes** — new codes in the right phase range; none renumbered or reused
+- [ ] **Target parity** — `typescript | rust | python | go` all still build the reference spec
+- [ ] **Cache / lock formats** — `.omni-cache/`, `omni.lock` still readable by the previous version
+- [ ] Not applicable — this change cannot touch any of the above, because: …
+
+## Irreversibility
+
+- [ ] Everything here is reversible by a revert.
+- [ ] This contains an irreversible change (syntax, IR, removed code/flag, published
+      artifact). ADR: `docs/adr/…`
+
+**Rollback plan:**
+
+## What a reviewer should actually look at
+
+Point at the two or three places where judgment is needed. If the honest answer
+is "nothing — the gates cover this", say that; it is a good answer.

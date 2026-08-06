@@ -7,10 +7,35 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Least privilege by default; jobs that need more ask for it explicitly.
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # Project conventions that no compiler enforces. Kept in scripts/gates/ so the
+  # same command runs on a laptop and here — a rule that only exists in this YAML
+  # file is a rule nobody can run before pushing.
+  gates:
+    name: Convention Gates
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # scripts/gates/changelog.sh diffs against the merge base.
+          fetch-depth: 0
+
+      - name: Setup OmniLang
+        uses: ./.github/actions/setup-omni
+
+      - name: Run all convention gates
+        env:
+          OMNI: ${{ github.workspace }}/target/release/omni
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: ./scripts/gates/run-all.sh
+
   check:
     name: Check & Lint
     runs-on: ubuntu-latest
@@ -29,10 +54,12 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets -- -D warnings
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
 
+      # --locked fails if Cargo.lock is stale, which is what makes the committed
+      # lock a reproducibility guarantee instead of a suggestion.
       - name: Run tests
-        run: cargo test --workspace
+        run: cargo test --workspace --locked
 
       # The exporter tests regenerate runtime/src/types.ts and ir.schema.json from
       # the Rust IR types on every `cargo test` run. If the committed files no
@@ -53,6 +80,8 @@ jobs:
       - name: Build Runtime
         run: npm run build --prefix runtime
 
+      # Coverage thresholds live in runtime/jest.config.js; --coverage is what
+      # activates them, so this step is the gate, not a report.
       - name: Run Runtime tests with coverage
         run: npm test --prefix runtime -- --coverage
 
@@ -78,35 +107,47 @@ jobs:
             echo "::endgroup::"
           done
 
+      # The `secrets` context is NOT available in a step-level `if:` — using it
+      # there is a workflow validation error that fails the whole run at 0s with
+      # no jobs and no logs. That is what killed this pipeline from 2026-05-26 to
+      # 2026-08-06. Branch inside the step instead, and announce the skip.
       - name: Run E2E Integration Test with Real LLM (Conditional)
-        if: ${{ secrets.ANTHROPIC_API_KEY != '' }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
         run: |
+          if [ -z "${ANTHROPIC_API_KEY}" ]; then
+            echo "::notice title=Real-LLM E2E skipped::ANTHROPIC_API_KEY is not set for this run"
+            exit 0
+          fi
           NODE_PATH=runtime/node_modules npx ts-node --project runtime/tsconfig.json scripts/test-real-llm.ts
 
-      - name: Verify examples with omni check
-        run: |
-          cargo run --bin omni -- check examples/checkout.omni
-          cargo run --bin omni -- check examples/self_correction.omni
-          cargo run --bin omni -- check examples/simple_greet.omni
-          cargo run --bin omni -- check examples/stabilization_test.schema.omni
-          cargo run --bin omni -- check examples/booking_flow.omni
-          cargo run --bin omni -- check examples/hybrid_billing.omni
+  deps:
+    name: Dependencies & Advisories
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      checks: write # rustsec/audit-check publishes advisories as a check run
+      issues: write # …and opens an issue for advisories found on a push
+    steps:
+      - uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - name: Check .omni specs (if any)
-        run: |
-          if ls src/**/*.omni 1>/dev/null 2>&1; then
-            omni check .
-          else
-            echo "No .omni files to check"
-          fi
+      - name: Audit runtime dependencies
+        run: npm audit --audit-level=high --prefix runtime
+
+      - name: Audit Rust dependencies
+        uses: rustsec/audit-check@v2
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: check
+    needs: [check, gates, deps]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - uses: actions/checkout@v4
@@ -115,7 +156,7 @@ jobs:
         uses: ./.github/actions/setup-omni
 
       - name: Build release
-        run: cargo build --workspace --release
+        run: cargo build --workspace --release --locked
 
       - name: Upload binaries
         uses: actions/upload-artifact@v4
@@ -124,44 +165,3 @@ jobs:
           path: |
             target/release/omni
             target/release/omni-lsp
-
-  cost-report:
-    name: Cost Report (PR)
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup OmniLang
-        uses: ./.github/actions/setup-omni
-
-      - name: Generate cost estimate
-        id: cost
-        run: |
-          if ls src/**/*.omni 1>/dev/null 2>&1; then
-            omni plan . --format json > /tmp/plan.json
-            echo "has_specs=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_specs=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Comment PR with cost
-        if: steps.cost.outputs.has_specs == 'true'
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const fs = require('fs');
-            const plan = JSON.parse(fs.readFileSync('/tmp/plan.json', 'utf8'));
-            const body = `## OmniLang Build Cost Estimate\n\n` +
-              `| Metric | Value |\n` +
-              `|--------|-------|\n` +
-              `| Services | ${plan.services || 'N/A'} |\n` +
-              `| RPCs | ${plan.rpcs || 'N/A'} |\n` +
-              `| Tests | ${plan.tests || 'N/A'} |\n` +
-              `| Estimated Cost | $${plan.estimated_cost || '0.00'} |\n`;
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body
-            });

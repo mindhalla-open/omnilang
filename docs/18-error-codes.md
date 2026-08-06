@@ -81,6 +81,7 @@ generated from the analyzer source (`crates/omni-analyzer/src/*.rs`).
                            … |
 | `E0241` | info | output '…' has optional type; accessing field on it \
                              may … |
+| `E0242` | error | service '…' declares unsupported target '…' (expected one of: typescript, rust, python, go) |
 | `E0301` | warning | service '…' has no constraints — consider adding latency, reliability, or security cons… |
 | `E0302` | warning | service '…' has no goal — the goal field helps AI agents understand the intent |
 | `E0303` | warning | Invariant '…' in service '…' is a natural language constraint and cannot be statically … |

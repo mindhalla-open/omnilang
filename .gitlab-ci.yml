@@ -1,6 +1,6 @@
 # GitLab CI pipeline for OmniLang — mirrors .github/workflows/ci.yml.
-# Lints, tests the Rust workspace + TypeScript runtime, and runs the mock-LLM
-# multi-target conformance matrix.
+# Lints, tests the Rust workspace + TypeScript runtime, runs the project
+# convention gates, and runs the mock-LLM multi-target conformance matrix.
 
 stages:
   - lint
@@ -23,13 +23,24 @@ fmt-clippy:
   script:
     - rustup component add rustfmt clippy
     - cargo fmt --all -- --check
-    - cargo clippy --workspace --all-targets -- -D warnings
+    - cargo clippy --workspace --all-targets --locked -- -D warnings
+
+# Project conventions live in scripts/gates/, not in this file — the same
+# command runs locally, on GitHub and here.
+convention-gates:
+  stage: lint
+  script:
+    - apt-get update && apt-get install -y python3
+    - cargo build --release --bin omni
+    - export OMNI="$CI_PROJECT_DIR/target/release/omni"
+    - export BASE_REF="${CI_MERGE_REQUEST_TARGET_BRANCH_SHA:-origin/main}"
+    - ./scripts/gates/run-all.sh
 
 cargo-test:
   stage: test
   script:
     - apt-get update && apt-get install -y z3
-    - cargo test --workspace
+    - cargo test --workspace --locked
     # Generated TS types and IR schema must not drift from the Rust IR.
     - git diff --exit-code runtime/src/types.ts runtime/src/ir.schema.json
 
@@ -39,7 +50,14 @@ runtime-test:
   script:
     - npm ci --prefix runtime
     - npm run build --prefix runtime
-    - npm test --prefix runtime
+    # Coverage thresholds in runtime/jest.config.js only apply with --coverage.
+    - npm test --prefix runtime -- --coverage
+
+dependency-audit:
+  stage: test
+  image: "node:20"
+  script:
+    - npm audit --audit-level=high --prefix runtime
 
 conformance-matrix:
   stage: e2e

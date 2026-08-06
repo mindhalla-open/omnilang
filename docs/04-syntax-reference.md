@@ -306,8 +306,8 @@ component <Name>
 ### Component Example
 
 ```omnilang
-component ProductCard {
-  goal: "Display a product with image, name, price, and add-to-cart action"
+component ProductCard
+  goal "Display a product with image, name, price, and add-to-cart action"
 
   props:
     product: Product
