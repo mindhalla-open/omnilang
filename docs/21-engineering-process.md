@@ -21,6 +21,11 @@ running at all, while the PR template asked contributors to confirm that clippy
 passed. The ceremony was intact. The gate was gone. Nobody noticed for ten weeks.
 That failure is now `scripts/gates/workflows.sh`.
 
+The sequel matters just as much. The run that was supposed to confirm that fix
+was red too — a test needed pytest before the step that installed it — and it
+stayed red for six more weeks, because the fix had been judged from a local run
+and nobody opened the CI page. A gate nobody looks at is a ritual with extra steps.
+
 ## The unit of work is an intent, not a task
 
 One epic = one intent = one owner = one vertical slice, carried from `.omni`

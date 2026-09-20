@@ -4,6 +4,22 @@ OmniLang is an ambitious project. This roadmap outlines the evolutionary path fr
 
 ---
 
+## Status (2026-09-20)
+
+The checkboxes below are the original plan, not a progress report. Where things stand:
+
+| Phase | State |
+|-------|-------|
+| 0 — Foundation | Implemented: parser, analyzer, `check` / `plan` / `build`, TypeScript target, scenario tests as generated Jest suites. |
+| 1 — Core Language | Implemented in prototype form: contracts, constraints, four targets, a contract-coverage gate. Property tests are generated into the output, not run by a dedicated runner. |
+| 2 — Production Readiness | Partial: module system, budgets, content-addressed cache, `omni.lock`, CI templates, an LSP binary. Missing: a binary that builds outside a repository checkout, and a reproducible-build story that survives a fresh clone. |
+| 3 — 5 | Prototypes and experimental commands only: `dashboard`, `publish` / `install` / `search` against a local mock registry, `--federated`, `agents benchmark`. None is production-grade. |
+
+The project is **alpha**. [`19-versioning-policy.md`](./19-versioning-policy.md) says what
+`1.0` will freeze; the [CHANGELOG](../CHANGELOG.md) says what has shipped.
+
+---
+
 ## Guiding Principle
 
 > Build the minimal useful thing first, prove it works on real problems, then expand.

@@ -91,13 +91,15 @@ Build succeeded. Confidence: High. Cost: $0.12. Duration: 1m 42s.
 > ⚠️ OmniLang is in early development. The CLI supports `omni check`, `omni plan`, `omni build` (TypeScript, Rust, Python, Go targets), `omni init`, `omni fmt`, and `omni verify`. Registry commands (`publish`, `install`, `search`) currently operate against a local mock registry.
 
 ```bash
-# From source (requires Rust 1.85+)
-cargo install omni-cli
+# From source (requires Rust 1.85+). Not on crates.io yet — the `omni-cli` crate
+# name there belongs to an unrelated project, so do not `cargo install` it.
+git clone https://github.com/mindhalla-open/omnilang.git
+cd omnilang
+cargo install --path crates/omni-cli --locked
 
-# Pre-built binaries coming soon:
-# curl -fsSL https://install.omnilang.dev | sh
-# brew install omnilang/tap/omni
-# npm install -g @omnilang/cli
+# `omni build` additionally needs Node.js 18+ and, today, a checkout of this
+# repository: it runs the generator from ./runtime. Pre-built binaries and
+# package-manager installs are planned but not published yet.
 ```
 
 ## Quick Start

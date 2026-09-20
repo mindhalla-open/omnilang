@@ -34,6 +34,7 @@ Run them all before pushing:
 | Multi-target conformance matrix (4 targets) | "it works on TypeScript, the rest probably follow" |
 | `npm audit --audit-level=high`, `rustsec/audit-check` | dependency review by eye. Fixed 4 high-severity advisories on 2026-08-06. |
 | `--locked` / `npm ci` on committed lockfiles | "works on my machine" (ADR-0010) |
+| Toolchain preflight in `runtime/tests/integration.test.ts` | reading a bare `Expected: 0, Received: 1`. **Incident 2026-08-06 → 2026-09-20:** the suite needed pytest before the CI step that installed it; main stayed red for six weeks while the changelog said CI was fixed. |
 
 ## Rules for gates
 
@@ -57,6 +58,11 @@ Recorded rather than quietly skipped:
 - **Docs prose is unverified** beyond OmniLang snippets — e.g. `docs/01-architecture.md`
   and `docs/05-compilation-model.md` describe OMWF as active while the module is
   unreferenced (ADR-0006).
+- **Nothing checks that a CI fix actually worked.** The 2026-08-06 workflow fix
+  was declared done from a local run; the first CI run after it was red for a
+  different reason and stayed red until 2026-09-20. Until branch protection
+  requires the checks, a red `main` needs a human to open
+  `gh run list --workflow ci.yml --branch main` after every push.
 - **No second reviewer.** The manifesto keeps four-eyes for irreversible changes;
   this project is one person, so the substitute is an ADR before the code, not a
   second human. That is a weaker control and should be named as one.

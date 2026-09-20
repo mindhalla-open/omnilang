@@ -96,4 +96,9 @@ service checkout
 
 ## Status
 
-🚧 **OmniLang is in the design phase.** This documentation describes the target architecture and serves as the specification for building the language toolchain.
+**Alpha (0.11).** The parser, analyzer, diagnostics, formatter, Z3 checks and the
+mock-verified build pipeline exist and run in CI on every push. Real-LLM builds, the
+runtime guardrail interpreter, the registry, the compliance dashboard and federated
+builds are prototypes or experimental commands. Documents 00–13 describe the target
+design and run ahead of the implementation in places; documents 18–21 and the
+[CHANGELOG](../CHANGELOG.md) describe what is implemented today.
