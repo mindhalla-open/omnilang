@@ -44,10 +44,14 @@ cargo-test:
     # Generated TS types and IR schema must not drift from the Rust IR.
     - git diff --exit-code runtime/src/types.ts runtime/src/ir.schema.json
 
+# The runtime integration suite builds the reference spec on all four targets,
+# so it needs the same toolchains as the conformance matrix — a bare node image
+# fails on the first Rust/Python/Go build.
 runtime-test:
   stage: test
-  image: "node:20"
   script:
+    - apt-get update && apt-get install -y z3 nodejs npm golang python3 python3-pip
+    - pip install --quiet --break-system-packages pytest
     - npm ci --prefix runtime
     - npm run build --prefix runtime
     # Coverage thresholds in runtime/jest.config.js only apply with --coverage.
@@ -63,7 +67,7 @@ conformance-matrix:
   stage: e2e
   script:
     - apt-get update && apt-get install -y z3 nodejs npm golang python3 python3-pip
-    - pip install --quiet pytest
+    - pip install --quiet --break-system-packages pytest
     - npm ci --prefix runtime && npm run build --prefix runtime
     - cargo build --bin omni
     - |

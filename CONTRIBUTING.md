@@ -6,6 +6,10 @@ Thank you for your interest in contributing to OmniLang! This document provides 
 
 - [Rust](https://rustup.rs/) (1.85+)
 - Git
+- For the runtime and its test suite: Node.js 20+, plus the target toolchains the
+  integration suite builds against — Go 1.22+, Python 3 with `pytest`, and Z3 on
+  `PATH` for the formal-verification tests. A missing tool fails the suite with a
+  message naming it; CI installs the same set in `.github/workflows/ci.yml`.
 
 ## Getting Started
 

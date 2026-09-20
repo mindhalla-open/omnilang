@@ -6,8 +6,47 @@ describe("OmniLang End-to-End Integration", () => {
   const rootDir = path.resolve(__dirname, "../..");
   const buildDir = path.resolve(rootDir, "build");
 
+  // Every target's toolchain must be on PATH, or a failure below is a bare
+  // "Expected: 0, Received: 1" with the cause buried in a child process. That
+  // is how CI stayed red for six weeks in 2026 over a missing pytest. Fail here
+  // instead and name the tool. CI installs this exact set before the suite
+  // runs (.github/workflows/ci.yml); CONTRIBUTING.md lists it for laptops.
+  const REQUIRED_TOOLS: Array<[string, string[], string]> = [
+    ["cargo", ["--version"], "Rust toolchain, rustup.rs"],
+    ["node", ["--version"], "Node.js 18+"],
+    ["go", ["version"], "Go 1.22+, needed for the go target"],
+    ["python3", ["-m", "pytest", "--version"], "Python 3 with pytest, needed for the python target"],
+  ];
+
+  function assertToolchains(): void {
+    const missing = REQUIRED_TOOLS.filter(([bin, args]) => {
+      const r = spawnSync(bin, args, { stdio: "ignore" });
+      return r.error !== undefined || r.status !== 0;
+    }).map(([bin, , what]) => `${bin} (${what})`);
+    if (missing.length > 0) {
+      throw new Error(`integration suite needs these tools on PATH: ${missing.join(", ")}`);
+    }
+  }
+
+  /** Runs `omni build <spec> --target <target>` with the mock LLM and prints the
+   *  child's output when it fails, so the cause is in the log, not just the code. */
+  function omniBuild(spec: string, target: string) {
+    const result = spawnSync(
+      "cargo",
+      ["run", "--bin", "omni", "--", "build", spec, "--target", target],
+      { cwd: rootDir, env: { ...process.env, OMNI_MOCK_LLM: "true" } }
+    );
+    if (result.status !== 0) {
+      console.error(`omni build ${spec} --target ${target} exited with ${result.status}`);
+      console.error("STDOUT:", result.stdout?.toString());
+      console.error("STDERR:", result.stderr?.toString());
+    }
+    return result;
+  }
+
   beforeAll(() => {
-    // 1. Build the Rust omni compiler binary first
+    assertToolchains();
+    // Build the Rust omni compiler binary first
     console.log("   [Integration Test] Building Rust compiler...");
     const cargoBuild = spawnSync("cargo", ["build", "--bin", "omni"], {
       cwd: rootDir,
@@ -48,23 +87,7 @@ describe("OmniLang End-to-End Integration", () => {
 
   test("should compile and generate TypeScript code from checkout.omni using mock LLM", () => {
     console.log("   [Integration Test] Running omni build...");
-    const buildResult = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "typescript"],
-      {
-        cwd: rootDir,
-        env: {
-          ...process.env,
-          OMNI_MOCK_LLM: "true",
-        },
-      }
-    );
-
-    // Assert that the command compiled and finished successfully
-    if (buildResult.status !== 0) {
-      console.error("STDOUT:", buildResult.stdout?.toString());
-      console.error("STDERR:", buildResult.stderr?.toString());
-    }
+    const buildResult = omniBuild("examples/checkout.omni", "typescript");
     expect(buildResult.status).toBe(0);
 
     // Verify expected TypeScript code files were generated
@@ -81,18 +104,7 @@ describe("OmniLang End-to-End Integration", () => {
 
   test("should compile and generate TypeScript state machine from booking_flow.omni using mock LLM", () => {
     console.log("   [Integration Test] Running omni build for booking_flow.omni...");
-    const buildResult = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/booking_flow.omni", "--target", "typescript"],
-      {
-        cwd: rootDir,
-        env: {
-          ...process.env,
-          OMNI_MOCK_LLM: "true",
-        },
-      }
-    );
-
+    const buildResult = omniBuild("examples/booking_flow.omni", "typescript");
     expect(buildResult.status).toBe(0);
 
     const stateMachineFile = path.join(buildDir, "src", "services", "BookingFlowStateMachine.ts");
@@ -108,18 +120,7 @@ describe("OmniLang End-to-End Integration", () => {
 
   test("should compile and generate Rust code from checkout.omni using mock LLM", () => {
     console.log("   [Integration Test] Running omni build for Rust...");
-    const buildResult = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "rust"],
-      {
-        cwd: rootDir,
-        env: {
-          ...process.env,
-          OMNI_MOCK_LLM: "true",
-        },
-      }
-    );
-
+    const buildResult = omniBuild("examples/checkout.omni", "rust");
     expect(buildResult.status).toBe(0);
 
     // Verify expected Rust code files were generated
@@ -136,11 +137,7 @@ describe("OmniLang End-to-End Integration", () => {
 
   test("should produce a valid Rust crate on a warm cache (mod.rs regression)", () => {
     // First build warms the .omni-cache for the rust target.
-    const warmup = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "rust"],
-      { cwd: rootDir, env: { ...process.env, OMNI_MOCK_LLM: "true" } }
-    );
+    const warmup = omniBuild("examples/checkout.omni", "rust");
     expect(warmup.status).toBe(0);
 
     // A fresh build dir + warm cache is the regression case: cached files are
@@ -148,15 +145,7 @@ describe("OmniLang End-to-End Integration", () => {
     // stays empty and the generated crate fails to compile.
     cleanBuildDir(buildDir);
 
-    const cachedBuild = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "rust"],
-      { cwd: rootDir, env: { ...process.env, OMNI_MOCK_LLM: "true" } }
-    );
-    if (cachedBuild.status !== 0) {
-      console.error("STDOUT:", cachedBuild.stdout?.toString());
-      console.error("STDERR:", cachedBuild.stderr?.toString());
-    }
+    const cachedBuild = omniBuild("examples/checkout.omni", "rust");
     expect(cachedBuild.status).toBe(0);
 
     const modRs = fs.readFileSync(path.join(buildDir, "src", "services", "mod.rs"), "utf8");
@@ -165,18 +154,7 @@ describe("OmniLang End-to-End Integration", () => {
 
   test("should compile and generate Python code from checkout.omni using mock LLM", () => {
     console.log("   [Integration Test] Running omni build for Python...");
-    const buildResult = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "python"],
-      {
-        cwd: rootDir,
-        env: {
-          ...process.env,
-          OMNI_MOCK_LLM: "true",
-        },
-      }
-    );
-
+    const buildResult = omniBuild("examples/checkout.omni", "python");
     expect(buildResult.status).toBe(0);
 
     // Verify expected Python code files were generated
@@ -193,18 +171,7 @@ describe("OmniLang End-to-End Integration", () => {
 
   test("should compile and generate Go code from checkout.omni using mock LLM", () => {
     console.log("   [Integration Test] Running omni build for Go...");
-    const buildResult = spawnSync(
-      "cargo",
-      ["run", "--bin", "omni", "--", "build", "examples/checkout.omni", "--target", "go"],
-      {
-        cwd: rootDir,
-        env: {
-          ...process.env,
-          OMNI_MOCK_LLM: "true",
-        },
-      }
-    );
-
+    const buildResult = omniBuild("examples/checkout.omni", "go");
     expect(buildResult.status).toBe(0);
 
     // Verify expected Go code files were generated
