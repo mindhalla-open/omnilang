@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `SECURITY.md`: supported versions, private vulnerability reporting, and the
+  threat model of the alpha — `omni build` runs model-written code and its
+  dependencies on the host without a sandbox.
+- Status blocks in `docs/README.md` and `docs/11-roadmap.md` saying what is
+  implemented versus what is still design.
+- The runtime integration suite pre-flights every toolchain it needs (cargo,
+  node, go, python3 + pytest) and names the missing one, and prints the child
+  process output when a build fails instead of a bare exit code.
 - **Gate-based development process** (ADR-0011): `scripts/gates/run-all.sh` runs
   seven convention gates locally and in CI — workflow validity, example
   check/format coverage, brace-free syntax canon, diagnostic-code documentation,
@@ -32,8 +40,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `formal_verification` and `proven` are now registered constraint names (no more `E0212: undefined constraint` when opting into proofs).
   - New example `examples/formal_transfer.omni` with two Z3-proven obligations and a deferred natural-language condition.
 
+### Removed
+
+- The TypeScript verification step no longer validates and emits a hard-coded
+  `CheckoutButton` React/Vue/Svelte component on every build regardless of the
+  spec (`runtime/src/testing/components.ts` deleted with it), and no longer
+  prints "Bypassing deprecated mock simulation tests".
+- The security step no longer prints a fake fuzzing harness that "tested" two
+  fixed payloads and always reported them rejected. What remains is a small
+  pattern scan (`eval(`, an unsafe-SQL marker, one known-bad lodash version)
+  that writes SARIF and is report-only, and it is now described as exactly that.
+- Generated demo artifacts `docs/index.html`, `docs/openapi.json` and
+  `docs/runbook.md` (`omni docs` output for `acme.phase1`) removed from the docs tree.
+
 ### Changed
 
+- `omni plan` human output prints the same token-based estimate as
+  `--format json` and the budgets gate, plus a tier recommendation labelled as
+  the fixed complexity heuristic it is. The previous output was invented: a
+  second, unrelated cost formula (about 4× the JSON number), an "ML-based"
+  router, an "A/B test group", an "87.5% pre-warmed cache hit rate" and a
+  build-time forecast, none of it measured. `estimated_cached_usd` in the JSON
+  is now `0.0` — a warm content-addressed cache makes no LLM call.
+- `omni dashboard` labels its compliance scores, regulatory reports and trend
+  chart as illustrative sample data; the "ML model selection router" card with
+  invented A/B results is gone.
+- CI installs Go and Python (with pytest) before the runtime test suite instead
+  of after it; the GitLab template gives the runtime job the same toolchains.
+- README no longer tells users to `cargo install omni-cli`: that name on
+  crates.io belongs to an unrelated project.
 - CI: explicit least-privilege `permissions:`, the hardcoded six-example
   `omni check` list replaced by a glob over all eleven, and the non-functional
   `cost-report` job (its `ls src/**/*.omni` guard never matched) replaced by an
@@ -43,6 +78,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **CI on `main` had still never been green.** The entry below fixed the
+  0-second workflow failure on 2026-08-06, but the very next run failed too, and
+  every run since: the runtime integration suite builds the Python target and
+  needs pytest, and the step installing pytest came after the suite. Locally the
+  suite passed because pytest was installed. Toolchain setup now precedes the
+  suite, and the suite fails fast with the tool's name when one is missing.
 - **CI had not run since 2026-05-26.** `.github/workflows/ci.yml` used
   `if: ${{ secrets.ANTHROPIC_API_KEY != '' }}` on a step; the `secrets` context is
   not available in `if:`, so GitHub rejected the workflow and failed every run in

@@ -2,7 +2,6 @@ import { spawnSync } from "child_process";
 import * as fs from "fs";
 import * as path from "path";
 import pc from "picocolors";
-import { ComponentValidator } from "./testing/components";
 
 export interface VerificationReport {
   success: boolean;
@@ -97,36 +96,6 @@ export class VerificationRunner {
     }
 
     console.log(`     ${pc.green("✓")} All Jest tests passed`);
-
-    // 3. Run Advanced Phase 3 Tests (Bypassed: Mock simulation layers are deprecated)
-    console.log(pc.yellow("     Bypassing deprecated mock simulation tests (visual, performance, security, chaos)..."));
-
-    // Component Specs validation & generation
-    const componentValidator = new ComponentValidator();
-    const componentRes = componentValidator.validate({
-      name: "CheckoutButton",
-      props: [{ name: "label", type: "string" }, { name: "disabled", type: "boolean" }],
-      state: [{ name: "isPending", type: "boolean" }],
-      events: [{ name: "onClick", params: [] }],
-      slots: ["icon"],
-      responsiveBreakpoints: ["mobile", "tablet", "desktop"],
-      accessibilityRules: ["contrast-ratio-4.5:1", "aria-labels"],
-      maxBundleSizeKb: 10
-    });
-    if (!componentRes.success) {
-      return { success: false, testError: `Component spec validation failed: ${componentRes.errors.join(", ")}` };
-    }
-
-    componentValidator.generateFrameworkComponents({
-      name: "CheckoutButton",
-      props: [{ name: "label", type: "string" }, { name: "disabled", type: "boolean" }],
-      state: [{ name: "isPending", type: "boolean" }],
-      events: [{ name: "onClick", params: [] }],
-      slots: ["icon"],
-      responsiveBreakpoints: ["mobile", "tablet", "desktop"],
-      accessibilityRules: ["contrast-ratio-4.5:1", "aria-labels"],
-      maxBundleSizeKb: 10
-    }, this.outputDir);
 
     return { success: true };
   }

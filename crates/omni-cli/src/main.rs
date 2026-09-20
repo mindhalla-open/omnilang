@@ -533,12 +533,14 @@ fn cmd_plan(path: &str, format: &str) -> i32 {
     }
 
     if let Some(ir) = ir {
+        // One estimator for every surface: this JSON, the human plan below and
+        // the budgets gate all print the same number.
+        let est = estimate_build_cost(
+            ir.stats.service_count,
+            ir.stats.operation_count,
+            ir.stats.test_count,
+        );
         if format == "json" {
-            let est = estimate_build_cost(
-                ir.stats.service_count,
-                ir.stats.operation_count,
-                ir.stats.test_count,
-            );
             println!(
                 "{}",
                 serde_json::json!({
@@ -550,7 +552,8 @@ fn cmd_plan(path: &str, format: &str) -> i32 {
                     "types": ir.stats.type_count,
                     "estimated_cost": format!("{:.4}", est),
                     "estimated_cost_usd": est,
-                    "estimated_cached_usd": est * 0.125,
+                    // A warm content-addressed cache makes no LLM call at all.
+                    "estimated_cached_usd": 0.0,
                 })
             );
             return 0;
@@ -585,45 +588,28 @@ fn cmd_plan(path: &str, format: &str) -> i32 {
 
         let operation_count = ir.stats.operation_count;
         let constraint_count: usize = ir.services.iter().map(|s| s.constraint_count).sum();
+        // A fixed heuristic, not a learned router: nothing here is measured. The
+        // model behind each tier is whatever `[generation]` in omni.toml pins.
         let complexity = operation_count + constraint_count * 2 + ir.stats.test_count;
-
-        println!("  {}", "Model Routing Recommendation (ML-based):".bold());
-        let (recommended_model, group_name) = if complexity > 10 {
-            ("Premium Tier (Sonnet-4)".magenta().bold(), "Premium")
+        let tier = if complexity > 10 {
+            "Premium".magenta().bold()
         } else if complexity > 3 {
-            ("Balanced Tier".cyan().bold(), "Balanced")
+            "Balanced".cyan().bold()
         } else {
-            ("Cheap Tier (Haiku)".green().bold(), "Cheap")
+            "Cheap".green().bold()
         };
-        println!("    - Recommended: {}", recommended_model);
+        println!("  {}", "Model tier (complexity heuristic):".bold());
         println!(
-            "    - Routing Decision: {} Escalation (cost/quality optimized)",
-            group_name
+            "    - Complexity score: {} (operations + 2×constraints + tests)",
+            complexity
         );
-        println!("    - Active Strategy: A/B Test Group B (Sonnet-4 + Z3 checking)");
+        println!("    - Recommended tier: {}", tier);
         println!();
 
-        println!("  {}", "Predictive Cost & Savings:".bold());
-        let cold_cost = ((ir.stats.service_count as f64 * 0.15)
-            + (operation_count as f64 * 0.05)
-            + (constraint_count as f64 * 0.10)
-            + (ir.stats.test_count as f64 * 0.02))
-            .max(0.05);
-        let cached_cost = cold_cost * 0.125;
-        println!("    - Estimated Cold Build Cost:   ~${:.2}", cold_cost);
-        println!("    - Estimated Cached Build Cost: ~${:.2}", cached_cost);
-        println!("    - Potential Cache Savings:     87.5%");
-        println!();
-
-        println!("  {}", "Cache Pre-warming & Hit Stats:".bold());
-        println!("    - Shared Cache Status: Pre-warmed & Active");
-        println!("    - Cache Pre-warm Hit Rate: 87.5% (Pre-check matching on refined schemas)");
-        let warm_time = 0.5 + (complexity as f64 * 0.2);
-        let cold_time = 3.0 + (complexity as f64 * 1.5);
-        println!(
-            "    - Estimated Build Time:        {:.1}s (Warm) / {:.1}s (Cold)",
-            warm_time, cold_time
-        );
+        // Same estimator as `--format json` and the budgets gate.
+        println!("  {}", "Estimated cost (token-based):".bold());
+        println!("    - Cold build:              ${:.4}", est);
+        println!("    - Rebuild with warm cache: $0.0000 (a cache hit makes no LLM call)");
         println!();
 
         println!(
@@ -2875,9 +2861,9 @@ fn cmd_dashboard(output: &str) -> i32 {
     <header>
       <div>
         <h1>Audit & Compliance Control</h1>
-        <div class="subtitle">Real-time SOC 2, PCI DSS, and HIPAA evidence logging</div>
+        <div class="subtitle">Experimental preview — the scores, regulatory reports and trend chart on this page are illustrative samples, not measurements. Only build_metrics.json is derived from real build artifacts.</div>
       </div>
-      <div class="score-badge">98.5% Compliance</div>
+      <div class="score-badge">Sample data</div>
     </header>
 
     <!-- Tab 1: Overview -->
@@ -2893,7 +2879,7 @@ fn cmd_dashboard(output: &str) -> i32 {
           </ul>
         </div>
         <div class="card">
-          <h3>Build Cost Trend (Last 7 Builds)</h3>
+          <h3>Build Cost Trend (sample data)</h3>
           <div class="chart-container">
             <svg viewBox="0 0 400 200">
               <path d="M 50 150 L 100 120 L 150 140 L 200 90 L 250 85 L 300 40 L 350 30" fill="none" stroke="#6366f1" stroke-width="4" />
@@ -2911,12 +2897,8 @@ fn cmd_dashboard(output: &str) -> i32 {
         </div>
       </div>
       <div class="card">
-        <h3>Agent Optimization & Selection Strategy</h3>
-        <p style="margin-bottom: 1rem;">Based on history, the ML engine chooses Balanced Tier to minimize costs while maintaining target safety bounds.</p>
-        <pre><code>[ML Model Selection Router]
-- Active Strategy: Balanced Escalation
-- A/B Test Group B (Sonnet-4 + Z3 checking) outperformed Group A (Haiku-only) by 24% quality.
-- Cache pre-warm hit rate: 87.5% (Pre-check matching on refined schemas).</code></pre>
+        <h3>Model Tier Selection</h3>
+        <p style="margin-bottom: 1rem;"><code>omni plan</code> recommends a tier from a fixed complexity heuristic (operations + 2×constraints + tests). No routing history or A/B results are collected yet; the model behind each tier is whatever <code>[generation]</code> in <code>omni.toml</code> pins.</p>
       </div>
     </section>
 

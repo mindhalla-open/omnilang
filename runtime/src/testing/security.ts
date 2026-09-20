@@ -12,8 +12,13 @@ export interface SecurityIssue {
 }
 
 /**
- * @deprecated Use real security scanning tools (e.g., Semgrep, OWASP dependency-check).
- * @internal This is a mock simulation layer and should not be used in production.
+ * A small, honest pattern scan of generated code, run report-only after a
+ * green build: `eval(`, an `unsafeSQL` marker, and one known-bad lodash
+ * version. Findings go to `.evidence/security_report.sarif` and into
+ * `build-report.json` as `security_issues`.
+ *
+ * This is not a SAST engine and does not fuzz anything. Plugging in a real
+ * scanner (Semgrep, OWASP dependency-check) is roadmap work.
  */
 export class SecurityRunner {
   private evidenceDir: string;
@@ -26,18 +31,17 @@ export class SecurityRunner {
   }
 
   public runSecurityScan(projectDir: string): { success: boolean; issues: SecurityIssue[] } {
-    console.log(`[Security Testing] Running SAST & Dependency Vulnerability Scan...`);
-    
+    console.log(`[Security Scan] Pattern scan of generated code (report-only)...`);
+
     const issues: SecurityIssue[] = [];
 
-    // Simulate SAST Semgrep scanning
-    // We check if code contains patterns like "eval(" or raw SQL string concatenation
+    // Source patterns: eval() and the unsafeSQL marker.
     const srcDir = path.join(projectDir, "src");
     if (fs.existsSync(srcDir)) {
       this.scanDirectoryRecursively(srcDir, issues);
     }
 
-    // Simulate OWASP Top 10 & dependency check (e.g. package.json)
+    // Dependency check: a single known-bad pin, not a vulnerability database.
     const packageJsonPath = path.join(projectDir, "package.json");
     if (fs.existsSync(packageJsonPath)) {
       const pkg = JSON.parse(fs.readFileSync(packageJsonPath, "utf8"));
@@ -53,13 +57,6 @@ export class SecurityRunner {
       }
     }
 
-    // Fuzzing simulation
-    console.log(`[Security Testing] Running fuzzing harness on operation inputs...`);
-    const sqlInjectionPayload = "1' OR '1'='1";
-    const xssPayload = "<script>alert('xss')</script>";
-    console.log(`   Testing payload: ${pc.yellow(sqlInjectionPayload)} -> Sanitized/Rejected.`);
-    console.log(`   Testing payload: ${pc.yellow(xssPayload)} -> Sanitized/Rejected.`);
-
     // Write SARIF report
     const sarifReport = this.generateSarifReport(issues);
     const sarifPath = path.join(this.evidenceDir, "security_report.sarif");
@@ -69,9 +66,9 @@ export class SecurityRunner {
     const success = errors.length === 0;
 
     if (success) {
-      console.log(`[Security Testing] ${pc.green("✓")} Security scan passed with 0 critical issues.`);
+      console.log(`[Security Scan] ${pc.green("✓")} No error-level pattern findings (not a full SAST run).`);
     } else {
-      console.error(pc.red(`[Security Testing] ❌ Security scan failed with ${errors.length} error(s):`));
+      console.error(pc.red(`[Security Scan] ❌ ${errors.length} error-level finding(s):`));
       for (const issue of errors) {
         console.error(`   - ${pc.bold(issue.ruleId)} at ${issue.filePath}:${issue.line}: ${issue.message}`);
       }
